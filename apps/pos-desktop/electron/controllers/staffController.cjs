@@ -80,7 +80,15 @@ module.exports = {
     });
 
     if (!foundUser) {
-      log.warn(`LOGIN: Noto'g'ri PIN kod bilan kirishga urinish.`);
+      log.warn(`LOGIN: Noto'g'ri PIN kod bilan kirishga urinish. Kiritilgan PIN: ${pin}`);
+      console.log('LOGIN DEBUG: Users count:', users.length);
+      users.forEach(u => {
+        if (!u.salt) console.log(` - User ${u.name} (No Salt): stored=${u.pin}, input=${pin}`);
+        else {
+          const { hash } = hashPIN(pin, u.salt);
+          console.log(` - User ${u.name}: stored_hash=${u.pin}, calc_hash=${hash}, salt=${u.salt}`);
+        }
+      });
       throw new Error("Noto'g'ri PIN kod");
     }
 

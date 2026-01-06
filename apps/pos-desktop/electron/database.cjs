@@ -643,12 +643,17 @@ function initDB() {
 function seedDefaults() {
     const OLD_DATE = '2000-01-01T00:00:00.000Z';
 
-    // Admin seeding removed per user request (0 db start)
-    // const ADMIN_ID = uuidv4();
-    // const adminExists = db.prepare("SELECT * FROM users WHERE role = 'admin'").get();
-    // if (!adminExists) {
-    //     // ...
-    // }
+    // Admin seeding restored per user request
+    const ADMIN_ID = uuidv4();
+    const adminExists = db.prepare("SELECT * FROM users WHERE role = 'admin'").get();
+    if (!adminExists) {
+        const { salt, hash } = hashPIN('0000', null);
+        db.prepare(`INSERT INTO users(id, name, pin, role, salt, restaurant_id, is_synced, updated_at) 
+            VALUES(?, ?, ?, ?, ?, ?, 0, ?)`).run(
+            ADMIN_ID, 'Admin', hash, 'admin', salt, RESTAURANT_ID, OLD_DATE
+        );
+        console.log("✅ Default Admin created: PIN 0000");
+    }
 
     // Settings
     const nextCheck = db.prepare("SELECT value FROM settings WHERE key = 'next_check_number'").get();

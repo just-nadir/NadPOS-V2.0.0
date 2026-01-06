@@ -23,7 +23,10 @@ function registerIpcHandlers(ipcMain) {
     // ==========================================
     ipcMain.handle('login', async (event, pin) => {
         try {
-            return staffController.login(pin);
+            console.log('ipcHandlers: pin received:', pin);
+            const res = staffController.login(pin);
+            console.log('ipcHandlers: login result:', res);
+            return res;
         } catch (error) {
             log.warn('Login failed:', error.message);
             throw error; // Frontendga xatoni qaytaramiz
