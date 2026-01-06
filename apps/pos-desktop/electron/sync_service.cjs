@@ -2,11 +2,14 @@ const { db } = require('./database.cjs');
 const log = require('electron-log');
 const fs = require('fs');
 const path = require('path');
+const io = require('socket.io-client'); // NEW: Socket.io
 
-const CLOUD_API_URL = 'https://halboldi.uz/api'; // Production URL
-const SYNC_INTERVAL_MS = 10000; // 10 seconds
+const CLOUD_API_URL = 'http://localhost:3000'; // DEV MODE (Was: https://halboldi.uz/api)
+const SYNC_INTERVAL_MS = 60000; // INCREASED to 60s (Polling fallback)
+const PUSH_INTERVAL_MS = 5000; // Check for local changes every 5s
 
 let isSyncing = false;
+let socket = null; // NEW: Socket instance
 
 // Tables to sync
 const TABLES = [
@@ -24,7 +27,11 @@ const TABLES = [
     'debt_history',
     'customer_debts',
     'cancelled_orders',
-    'settings'
+    'settings',
+    'sms_templates',
+    'sms_logs',
+    'supplies',
+    'supply_items'
 ];
 
 const TABLE_SCHEMAS = {};
@@ -67,13 +74,49 @@ function getCredentials() {
     return null;
 }
 
+// --- NEW: Socket Initialization ---
+function initSocket(restaurantId) {
+    if (socket && socket.connected) return;
+
+    // Base URL determination (assuming /api is suffix)
+    // If CLOUD_API_URL is "http://localhost:3000", socket is "http://localhost:3000/sync"
+    // Using string replacement to be safe if /api is present or not
+    const baseUrl = CLOUD_API_URL.replace('/api', '');
+
+    console.log(`🔌 Connecting to Socket: ${baseUrl}/sync`);
+
+    socket = io(`${baseUrl}/sync`, {
+        query: { restaurantId },
+        transports: ['websocket', 'polling'],
+        reconnectionDelay: 5000
+    });
+
+    socket.on('connect', () => {
+        console.log("🟢 Socket Connected!");
+        notifyUI('online', new Date().toISOString());
+    });
+
+    socket.on('disconnect', () => {
+        console.log("🔴 Socket Disconnected");
+        notifyUI('error', null);
+    });
+
+    socket.on('server_data_update', (data) => {
+        console.log(`⚡ Real-time Update: ${data.table}`);
+        pullChanges(); // Immediate Pull
+    });
+}
+
 async function pushChanges() {
     const creds = getCredentials();
     if (!creds) {
-        console.log("⏳ Sync Skipped: No credentials found.");
+        // console.log("⏳ Sync Skipped: No credentials found.");
         return false;
     }
     const { restaurantId, accessKey } = creds;
+
+    // Init Socket if needed
+    initSocket(restaurantId);
 
     const payload = {
         restaurantId,
@@ -168,15 +211,6 @@ async function pushChanges() {
 
     console.log("📤 Pushing changes:", recordCounts);
 
-    // DEBUG: Save payload to file
-    try {
-        const debugPath = path.join(__dirname, 'debug_payload.json');
-        fs.writeFileSync(debugPath, JSON.stringify(payload, null, 2));
-        console.log(`🐛 Debug payload written to: ${debugPath}`);
-    } catch (err) {
-        console.error("Failed to write debug payload:", err);
-    }
-
     notifyUI('syncing', null);
 
     // 2. Send to Cloud
@@ -236,33 +270,26 @@ function startSyncService() {
     loadSchemas();
     console.log("🔄 Sync Service Started...");
 
+    // Initial Creds check
+    const creds = getCredentials();
+    if (creds) {
+        initSocket(creds.restaurantId);
+        pullChanges(); // Initial pull
+    }
+
+    // Polling for Push (frequent)
     setInterval(async () => {
         if (isSyncing) return;
         isSyncing = true;
+        await pushChanges();
+        isSyncing = false;
+    }, PUSH_INTERVAL_MS);
 
-        const pulled = await pullChanges();
-        const pushed = await pushChanges();
-
-        // If any error occurred (returned null), do not set status to online
-        if (pulled === null || pushed === null) {
-            return;
-        }
-
-        // Always notify online if we successfully checked (didn't catch an error)
-        // Since error states are handled inside push/pull, if we are here we are "online"
-        if (!pushed && !pulled) {
-            const creds = getCredentials();
-            if (creds) { // Only notify online if we are actually allowed to sync
-                notifyUI('online', new Date().toISOString());
-
-                heartbeatCounter++;
-                if (heartbeatCounter >= 6) { // Every 1 minute
-                    console.log(`💓 Sync Heartbeat: ${new Date().toLocaleTimeString()} (All synced)`);
-                    heartbeatCounter = 0;
-                }
-            }
-        }
-
+    // Polling for Pull (fallback / infrequent)
+    setInterval(async () => {
+        if (isSyncing) return;
+        isSyncing = true;
+        await pullChanges();
         isSyncing = false;
     }, SYNC_INTERVAL_MS);
 }
@@ -271,6 +298,9 @@ async function pullChanges() {
     const creds = getCredentials();
     if (!creds) return false;
     const { restaurantId, accessKey } = creds;
+
+    // Ensure socket connected
+    initSocket(restaurantId);
 
     // 1. Get last pulled time
     const setting = db.prepare("SELECT value FROM settings WHERE key = 'last_pulled_at'").get();
@@ -283,6 +313,7 @@ async function pullChanges() {
             lastSyncTime: lastPulledAt
         });
 
+        // Use standard URL here (assuming /api)
         const response = await fetch(`${CLOUD_API_URL}/sync/pull?${queryParams}`, {
             headers: { 'x-access-key': accessKey }
         });

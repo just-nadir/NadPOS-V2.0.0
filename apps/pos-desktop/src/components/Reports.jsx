@@ -70,7 +70,7 @@ const Reports = () => {
       const [sData, cData, tData] = await Promise.all([
         ipcRenderer.invoke('get-sales', range),
         ipcRenderer.invoke('get-cancelled-orders', range),
-        ipcRenderer.invoke('get-sales-trend')
+        ipcRenderer.invoke('get-sales-trend', range)
       ]);
 
       setSalesData(sData || []);
@@ -289,7 +289,7 @@ const Reports = () => {
       {/* Sales Trend (30 Days) */}
       <div className="bg-card p-6 rounded-2xl border border-border shadow-sm flex flex-col h-[350px]">
         <h3 className="font-bold text-foreground mb-6 flex items-center gap-2">
-          <TrendingUp size={18} className="text-primary" /> Oxirgi 30 kunlik dinamika
+          <TrendingUp size={18} className="text-primary" /> Savdo Dinamikasi (Kuny)
         </h3>
         <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">

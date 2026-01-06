@@ -470,19 +470,38 @@ module.exports = {
         }
     },
 
-    getSalesTrend: () => {
+    getSalesTrend: (startDate, endDate) => {
         try {
-            // Oxirgi 30 kunlik statistika
-            const query = `
-                SELECT 
-                    strftime('%Y-%m-%d', date) as day, 
-                    SUM(total_amount) as total 
-                FROM sales 
-                WHERE date(date) >= date('now', '-30 days') 
-                GROUP BY strftime('%Y-%m-%d', date) 
-                ORDER BY day ASC
-            `;
-            const results = db.prepare(query).all();
+            let query;
+            let params = [];
+
+            if (startDate && endDate) {
+                // Filter by provided range
+                query = `
+                    SELECT 
+                        strftime('%Y-%m-%d', date) as day, 
+                        SUM(total_amount) as total 
+                    FROM sales 
+                    WHERE datetime(date, 'localtime') >= datetime(?) 
+                      AND datetime(date, 'localtime') <= datetime(?)
+                    GROUP BY strftime('%Y-%m-%d', date) 
+                    ORDER BY day ASC
+                `;
+                params = [startDate, endDate];
+            } else {
+                // Default: Last 30 days
+                query = `
+                    SELECT 
+                        strftime('%Y-%m-%d', date) as day, 
+                        SUM(total_amount) as total 
+                    FROM sales 
+                    WHERE date(date) >= date('now', '-30 days') 
+                    GROUP BY strftime('%Y-%m-%d', date) 
+                    ORDER BY day ASC
+                `;
+            }
+
+            const results = db.prepare(query).all(...params);
             return results;
         } catch (err) {
             log.error("getSalesTrend xatosi:", err);

@@ -5,10 +5,10 @@ const log = require('electron-log');
 const crypto = require('crypto');
 
 // --- Baza manzilini aniqlash ---
-const isDev = !app.isPackaged;
+const isDev = app && app.isPackaged !== undefined ? !app.isPackaged : true;
 const dbPath = isDev
     ? path.join(__dirname, '../pos.db')
-    : path.join(app.getPath('userData'), 'pos.db');
+    : path.join(app ? app.getPath('userData') : __dirname, 'pos.db');
 
 console.log("📂 BAZA MANZILI (V2):", dbPath);
 
@@ -337,6 +337,28 @@ function createV2Tables() {
     // Supplies Indexes
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_supplies_status ON supplies(status)`).run();
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_supply_items_supply ON supply_items(supply_id)`).run();
+
+    // --- NEW: Sync & Update Performance Indexes (V2.0.1) ---
+    const tablesToSync = [
+        'users', 'kitchens', 'halls', 'tables', 'categories', 'products', 'customers', 'shifts',
+        'sales', 'sale_items', 'order_items', 'debt_history', 'customer_debts', 'cancelled_orders', 'settings',
+        'sms_templates', 'sms_logs', 'supplies', 'supply_items'
+    ];
+
+    for (const tbl of tablesToSync) {
+        try {
+            db.prepare(`CREATE INDEX IF NOT EXISTS idx_${tbl}_sync ON ${tbl}(is_synced)`).run();
+            db.prepare(`CREATE INDEX IF NOT EXISTS idx_${tbl}_updated ON ${tbl}(updated_at)`).run();
+            db.prepare(`CREATE INDEX IF NOT EXISTS idx_${tbl}_rid ON ${tbl}(restaurant_id)`).run();
+        } catch (e) {
+            // Ignore if table doesn't exist or index error (e.g. settings has no restaurant_id? settings table def has restaurant_id? checking schema...)
+            // Schema check: 
+            // settings: `is_synced INTEGER DEFAULT 0, updated_at TEXT ...` - NO restaurant_id in schema above for settings!
+            // settings has KEY, VALUE.
+            // users, kitchens... have restaurant_id.
+            // Let's be safe.
+        }
+    }
 }
 
 // --- MIGRATION LOGIC (V1 -> V2) ---

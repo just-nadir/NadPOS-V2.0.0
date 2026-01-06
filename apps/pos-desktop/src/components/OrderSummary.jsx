@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CreditCard, User, Wallet, X, Printer, Hash, Trash2, PlusCircle, ArrowRightLeft } from 'lucide-react';
 import PaymentModal from './PaymentModal';
 import CustomerModal from './CustomerModal';
@@ -25,16 +25,7 @@ const OrderSummary = ({ table, onDeselect }) => {
 
   const { settings, showToast } = useGlobal();
 
-  useEffect(() => {
-    setSelectedCustomer(null);
-    setBonusToUse(0);
-    setOrderItems([]);
-    if (table) {
-      loadOrderItems(table.id);
-    }
-  }, [table]);
-
-  const loadOrderItems = async (tableId) => {
+  const loadOrderItems = useCallback(async (tableId) => {
     if (!window.electron) return;
     setLoading(true);
     try {
@@ -46,7 +37,16 @@ const OrderSummary = ({ table, onDeselect }) => {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    setSelectedCustomer(null);
+    setBonusToUse(0);
+    setOrderItems([]);
+    if (table) {
+      loadOrderItems(table.id);
+    }
+  }, [table, loadOrderItems]);
 
   // Hotkeys
   useEffect(() => {
@@ -64,7 +64,7 @@ const OrderSummary = ({ table, onDeselect }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [table, orderItems]);
 
-  const handlePrintCheck = async () => {
+  const handlePrintCheck = useCallback(async () => {
     if (!table || !window.electron || printingCheck) return;
 
     setPrintingCheck(true);
@@ -81,13 +81,13 @@ const OrderSummary = ({ table, onDeselect }) => {
     } finally {
       setPrintingCheck(false);
     }
-  };
+  }, [table, printingCheck, showToast]);
 
-  const handleRemoveItem = (item) => {
+  const handleRemoveItem = useCallback((item) => {
     setItemToReturn(item);
-  };
+  }, []);
 
-  const handleReturnItem = async (itemId, quantity, reason) => {
+  const handleReturnItem = useCallback(async (itemId, quantity, reason) => {
     if (!window.electron) return;
     try {
       const { ipcRenderer } = window.electron;
@@ -102,9 +102,9 @@ const OrderSummary = ({ table, onDeselect }) => {
       console.error("Return item error:", error);
       showToast('error', "Qaytarishda xatolik: " + error.message);
     }
-  };
+  }, [table, showToast, loadOrderItems]);
 
-  const confirmRemoveItem = async () => {
+  const confirmRemoveItem = useCallback(async () => {
     if (!itemToDelete || !window.electron) return;
     try {
       const { ipcRenderer } = window.electron;
@@ -118,9 +118,9 @@ const OrderSummary = ({ table, onDeselect }) => {
       console.error("Remove item error:", error);
       showToast('error', "Xatolik: " + error.message);
     }
-  };
+  }, [itemToDelete, table, showToast, loadOrderItems]);
 
-  const handleCancelOrder = async () => {
+  const handleCancelOrder = useCallback(async () => {
     if (!table || !window.electron) return;
     try {
       const { ipcRenderer } = window.electron;
@@ -132,37 +132,44 @@ const OrderSummary = ({ table, onDeselect }) => {
       console.error("Cancel error:", error);
       showToast('error', "Xatolik yuz berdi: " + error.message);
     }
-  };
+  }, [table, onDeselect, showToast]);
 
-  const handlePrintCheckDisabled = () => {
+  const handlePrintCheckDisabled = useCallback(() => {
     return !table || orderItems.length === 0 || printingCheck || loading;
-  };
+  }, [table, orderItems.length, printingCheck, loading]);
 
-  const subtotal = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const subtotal = useMemo(() => {
+    return orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  }, [orderItems]);
+
   const guestsCount = table?.guests || 0;
 
-  let service = 0;
-  const svcValue = Number(settings.serviceChargeValue) || 0;
-
-  if (settings.serviceChargeType === 'percent') {
-    service = (subtotal * svcValue) / 100;
-  } else {
-    service = guestsCount * svcValue;
-  }
+  const service = useMemo(() => {
+    const svcValue = Number(settings.serviceChargeValue) || 0;
+    if (settings.serviceChargeType === 'percent') {
+      return (subtotal * svcValue) / 100;
+    } else {
+      return guestsCount * svcValue;
+    }
+  }, [subtotal, settings.serviceChargeValue, settings.serviceChargeType, guestsCount]);
 
   const preTotal = subtotal + service;
 
-  let discountAmount = 0;
-  if (selectedCustomer) {
-    if (selectedCustomer.type === 'discount') {
-      discountAmount = (subtotal * selectedCustomer.value) / 100;
-    } else if (selectedCustomer.type === 'cashback') {
-      discountAmount = bonusToUse;
+  const discountAmount = useMemo(() => {
+    let amount = 0;
+    if (selectedCustomer) {
+      if (selectedCustomer.type === 'discount') {
+        amount = (subtotal * selectedCustomer.value) / 100;
+      } else if (selectedCustomer.type === 'cashback') {
+        amount = bonusToUse;
+      }
     }
-  }
+    return amount;
+  }, [subtotal, selectedCustomer, bonusToUse]);
+
   const finalTotal = preTotal - discountAmount;
 
-  const handlePaymentSuccess = async (methodOrPayments, dueDateOrIsSplit) => {
+  const handlePaymentSuccess = useCallback(async (methodOrPayments, dueDateOrIsSplit) => {
     if (!table || !window.electron) return;
     try {
       const { ipcRenderer } = window.electron;
@@ -213,7 +220,7 @@ const OrderSummary = ({ table, onDeselect }) => {
     } catch (error) {
       console.error(error);
     }
-  };
+  }, [table, finalTotal, subtotal, discountAmount, selectedCustomer, orderItems, onDeselect]);
 
   const handleBonusChange = (e) => {
     const valueStr = e.target.value;

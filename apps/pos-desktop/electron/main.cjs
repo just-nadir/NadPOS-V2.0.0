@@ -19,7 +19,11 @@ process.on('unhandledRejection', (reason) => {
   log.error('Ushlanmagan Promise:', reason);
 });
 
-app.disableHardwareAcceleration();
+// app.disableHardwareAcceleration();
+if (app) {
+  app.disableHardwareAcceleration();
+}
+
 function createWindow() {
   try {
     initDB();
