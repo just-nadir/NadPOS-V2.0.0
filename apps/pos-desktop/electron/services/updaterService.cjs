@@ -6,8 +6,8 @@ const { ipcMain, app } = require('electron');
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'info';
 
-// Auto download is set to true by default, but let's be explicit
-autoUpdater.autoDownload = true;
+// Auto download is set to false to allow manual control
+autoUpdater.autoDownload = false;
 
 /**
  * Initialize the updater service
@@ -48,7 +48,7 @@ function initUpdater(mainWindow) {
     sendStatusToWindow(log_message);
 
     // Send progress to frontend
-    mainWindow.webContents.send('download-progress', progressObj.percent);
+    mainWindow.webContents.send('download-progress', progressObj);
   });
 
   autoUpdater.on('update-downloaded', (info) => {
@@ -58,7 +58,12 @@ function initUpdater(mainWindow) {
 
   // Listen for restart signal from frontend
   ipcMain.on('restart_app', () => {
-    autoUpdater.quitAndInstall(true, true);
+    autoUpdater.quitAndInstall(true, true); // Silent install
+  });
+
+  // Listen for manual download signal from frontend
+  ipcMain.on('start-download', () => {
+    autoUpdater.downloadUpdate();
   });
 
   // Manual check for updates

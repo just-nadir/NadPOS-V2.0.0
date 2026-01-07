@@ -88,16 +88,24 @@ function initSocket(restaurantId) {
     socket = io(`${baseUrl}/sync`, {
         query: { restaurantId },
         transports: ['websocket', 'polling'],
-        reconnectionDelay: 5000
+        reconnectionDelay: 5000,
+        timeout: 20000
     });
+
+    notifyUI('connecting', null);
 
     socket.on('connect', () => {
         console.log("🟢 Socket Connected!");
         notifyUI('online', new Date().toISOString());
     });
 
-    socket.on('disconnect', () => {
-        console.log("🔴 Socket Disconnected");
+    socket.on('disconnect', (reason) => {
+        console.log("🔴 Socket Disconnected:", reason);
+        notifyUI('error', null);
+    });
+
+    socket.on('connect_error', (err) => {
+        console.error("🔴 Socket Connection Error:", err.message);
         notifyUI('error', null);
     });
 

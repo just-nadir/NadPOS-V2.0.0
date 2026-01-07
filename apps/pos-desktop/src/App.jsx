@@ -97,7 +97,7 @@ function App() {
 
             </Routes>
           </Suspense>
-          <UpdateNotification />
+          {/* <UpdateNotification /> - Removed by user request */}
         </Router>
       </ErrorBoundary>
     </ThemeProvider>

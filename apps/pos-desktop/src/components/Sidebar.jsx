@@ -18,6 +18,7 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user, onCloseShift, syncSta
   const getSyncIcon = () => {
     const { status } = syncStatus || {};
     if (status === 'syncing') return <RefreshCw className="animate-spin text-blue-500" size={24} />;
+    if (status === 'connecting') return <Cloud className="animate-pulse text-yellow-500" size={24} />;
     if (status === 'online') return <Cloud className="text-green-500" size={24} />;
     if (status === 'error') return <CloudOff className="text-red-500" size={24} />;
     return <CloudOff className="text-muted-foreground" size={24} />;
