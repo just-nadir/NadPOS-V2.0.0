@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, Printer, Database, Store, Receipt, Percent, RefreshCw, ChefHat, Plus, Trash2, Users, Shield, Key, Coins, CheckCircle, PcCase, MessageSquare, Send, FileText, History, Settings as SettingsIcon } from 'lucide-react';
 import QRCode from "react-qr-code";
 import ConfirmModal from './ConfirmModal';
+import UpdateSettings from './settings/UpdateSettings';
 import { formatDate } from '../utils/dateUtils';
 import { cn } from '../utils/cn';
 
@@ -168,7 +169,7 @@ const Settings = () => {
           <button onClick={() => setActiveTab('general')} className={cn("w-full text-left px-6 h-14 rounded-2xl font-bold flex items-center gap-4 transition-all text-lg", activeTab === 'general' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}><Store size={24} /> Umumiy</button>
           <button onClick={() => setActiveTab('users')} className={cn("w-full text-left px-6 h-14 rounded-2xl font-bold flex items-center gap-4 transition-all text-lg", activeTab === 'users' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}><Users size={24} /> Xodimlar</button>
           <button onClick={() => setActiveTab('printer_settings')} className={cn("w-full text-left px-6 h-14 rounded-2xl font-bold flex items-center gap-4 transition-all text-lg", activeTab === 'printer_settings' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}><Printer size={24} /> Printerlar</button>
-
+          <button onClick={() => setActiveTab('update')} className={cn("w-full text-left px-6 h-14 rounded-2xl font-bold flex items-center gap-4 transition-all text-lg", activeTab === 'update' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}><RefreshCw size={24} /> Yangilash</button>
         </div>
         <div className="mt-auto">
           <button onClick={handleSaveSettings} disabled={loading} className="w-full bg-blue-600 text-white h-16 rounded-2xl font-bold shadow-xl shadow-blue-500/20 hover:bg-blue-700 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-70 text-xl">
@@ -354,6 +355,9 @@ const Settings = () => {
         )}
 
 
+
+        {/* --- UPDATE SETTINGS --- */}
+        {activeTab === 'update' && <UpdateSettings />}
       </div>
 
       <ConfirmModal

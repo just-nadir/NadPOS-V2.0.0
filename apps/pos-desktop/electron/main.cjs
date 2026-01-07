@@ -5,6 +5,7 @@ const { initDB, onChange } = require('./database.cjs');
 const startServer = require('./server.cjs');
 const registerIpcHandlers = require('./ipcHandlers.cjs');
 const { startSyncService, setMainWindow } = require('./sync_service.cjs');
+const { initUpdater } = require('./services/updaterService.cjs');
 
 // --- LOGGER SOZLAMALARI ---
 log.transports.file.level = 'info';
@@ -66,6 +67,9 @@ function createWindow() {
   // Set window for sync status updates
   setMainWindow(win);
   startSyncService();
+
+  // Initialize Auto Updater
+  initUpdater(win);
 
   win.webContents.on('render-process-gone', (event, details) => {
     log.error('Renderer jarayoni quladi:', details.reason);

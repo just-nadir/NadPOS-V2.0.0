@@ -32,5 +32,12 @@ contextBridge.exposeInMainWorld('api', {
     if (stack) {
       log.error('Stack:', stack);
     }
-  }
+  },
+  // Auto Updater API
+  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (event, ...args) => callback(...args)),
+  onUpdateProgress: (callback) => ipcRenderer.on('download-progress', (event, ...args) => callback(...args)),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (event, ...args) => callback(...args)),
+  triggerRestart: () => ipcRenderer.send('restart_app'),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version')
 });

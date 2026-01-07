@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeProvider';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorBoundary from './components/ErrorBoundary';
 import Onboarding from './components/Onboarding';
+import UpdateNotification from './components/UpdateNotification';
 
 // Lazy loading - Code Splitting
 const DesktopLayout = lazy(() => import('./components/DesktopLayout'));
@@ -96,6 +97,7 @@ function App() {
 
             </Routes>
           </Suspense>
+          <UpdateNotification />
         </Router>
       </ErrorBoundary>
     </ThemeProvider>
