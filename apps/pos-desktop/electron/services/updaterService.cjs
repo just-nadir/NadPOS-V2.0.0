@@ -58,7 +58,7 @@ function initUpdater(mainWindow) {
 
   // Listen for restart signal from frontend
   ipcMain.on('restart_app', () => {
-    autoUpdater.quitAndInstall();
+    autoUpdater.quitAndInstall(true, true);
   });
 
   // Manual check for updates

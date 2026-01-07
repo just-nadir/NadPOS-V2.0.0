@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { LayoutGrid, UtensilsCrossed, Settings, LogOut, Square, Users, FileText, PieChart, MessageSquare, Lock, Search, Cloud, CloudOff, RefreshCw, Package, Moon, Sun, Monitor } from 'lucide-react';
 import { APP_INFO } from '../config/appConfig';
 import { cn } from '../utils/cn';
@@ -7,6 +7,13 @@ import { useTheme } from '../context/ThemeProvider';
 
 const Sidebar = ({ activePage, onNavigate, onLogout, user, onCloseShift, syncStatus }) => {
   const { theme, setTheme } = useTheme();
+  const [appVersion, setAppVersion] = useState(APP_INFO.version);
+
+  useEffect(() => {
+    if (window.api && window.api.getAppVersion) {
+      window.api.getAppVersion().then(v => setAppVersion(`v${v}`));
+    }
+  }, []);
 
   const getSyncIcon = () => {
     const { status } = syncStatus || {};
@@ -96,7 +103,7 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user, onCloseShift, syncSta
           <button onClick={onLogout} className="p-3 text-destructive hover:bg-destructive/10 rounded-xl transition-all" title="Chiqish">
             <LogOut size={24} />
           </button>
-          <span className="text-[10px] text-muted-foreground font-mono">{APP_INFO.version}</span>
+          <span className="text-[10px] text-muted-foreground font-mono">{appVersion}</span>
         </div>
       </div>
     </div>

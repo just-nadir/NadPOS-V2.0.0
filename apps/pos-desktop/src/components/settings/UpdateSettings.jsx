@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, CheckCircle, AlertCircle, Download, Package, ArrowRight, Sparkles, FileText, X } from 'lucide-react';
+import { dotWave } from 'ldrs'
+dotWave.register()
 
 const UpdateSettings = () => {
     const [loading, setLoading] = useState(false);
@@ -40,8 +42,15 @@ const UpdateSettings = () => {
                 const result = await window.api.checkForUpdates();
 
                 if (result && result.updateInfo) {
-                    setUpdateInfo(result.updateInfo);
-                    setStatus({ type: 'success', msg: `Yangilanish topildi: v${result.updateInfo.version}` });
+                    const localVer = version;
+                    const remoteVer = result.updateInfo.version;
+
+                    if (localVer !== remoteVer) {
+                        setUpdateInfo(result.updateInfo);
+                        setStatus({ type: 'success', msg: `Yangilanish topildi: v${result.updateInfo.version}` });
+                    } else {
+                        setStatus({ type: 'info', msg: 'Siz eng so\'nggi versiyadan foydalanmoqdasiz.' });
+                    }
                 } else {
                     setStatus({ type: 'info', msg: 'Siz eng so\'nggi versiyadan foydalanmoqdasiz.' });
                 }
@@ -97,22 +106,31 @@ const UpdateSettings = () => {
                     <button
                         onClick={checkUpdates}
                         disabled={loading}
-                        className="w-full md:w-auto px-8 py-4 bg-gray-900 dark:bg-white dark:text-gray-900 text-white rounded-2xl font-bold text-lg hover:scale-105 active:scale-95 transition-all shadow-xl hover:shadow-2xl disabled:opacity-70 disabled:hover:scale-100 flex items-center justify-center gap-3"
+                        className="w-full md:w-auto px-8 py-4 bg-gray-900 dark:bg-white dark:text-gray-900 text-white rounded-2xl font-bold text-lg hover:scale-105 active:scale-95 transition-all shadow-xl hover:shadow-2xl disabled:opacity-70 disabled:hover:scale-100 flex items-center justify-center gap-3 min-w-[200px]"
                     >
-                        {loading ? <RefreshCw className="animate-spin" /> : <RefreshCw />}
-                        {loading ? 'Tekshirilmoqda...' : 'Yangilanishni Tekshirish'}
+                        {loading ? (
+                            <l-dot-wave
+                                size="30"
+                                speed="1"
+                                color="white"
+                            ></l-dot-wave>
+                        ) : (
+                            <>
+                                <RefreshCw /> Yangilanishni Tekshirish
+                            </>
+                        )}
                     </button>
                 </div>
 
                 {/* Status Message Area */}
                 {status && (
                     <div className={`mt-8 p-6 rounded-2xl border-2 flex items-start gap-4 animate-in zoom-in-95 duration-300 ${status.type === 'success' ? 'bg-green-50/50 border-green-100 text-green-900' :
-                            status.type === 'error' ? 'bg-red-50/50 border-red-100 text-red-900' :
-                                'bg-blue-50/50 border-blue-100 text-blue-900'
+                        status.type === 'error' ? 'bg-red-50/50 border-red-100 text-red-900' :
+                            'bg-blue-50/50 border-blue-100 text-blue-900'
                         }`}>
                         <div className={`mt-1 p-2 rounded-full ${status.type === 'success' ? 'bg-green-200 text-green-700' :
-                                status.type === 'error' ? 'bg-red-200 text-red-700' :
-                                    'bg-blue-200 text-blue-600'
+                            status.type === 'error' ? 'bg-red-200 text-red-700' :
+                                'bg-blue-200 text-blue-600'
                             }`}>
                             {status.type === 'success' ? <Download size={24} /> :
                                 status.type === 'error' ? <AlertCircle size={24} /> :
@@ -133,9 +151,21 @@ const UpdateSettings = () => {
                                         <span>Yuklanmoqda...</span>
                                         <span>{progress}%</span>
                                     </div>
+
                                     <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
                                         <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${progress}%` }}></div>
                                     </div>
+                                </div>
+                            )}
+
+                            {showRestartButton && (
+                                <div className="mt-4">
+                                    <button
+                                        onClick={() => window.api.triggerRestart()}
+                                        className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-500/20 active:scale-95 transition-all flex items-center gap-2"
+                                    >
+                                        <RefreshCw size={20} /> Yangilash va qayta ishga tushirish
+                                    </button>
                                 </div>
                             )}
 

@@ -1,7 +1,7 @@
 {
   "name": "pos-desktop",
   "private": true,
-  "version": "2.0.1",
+  "version": "2.0.2",
   "main": "electron/main.cjs",
   "description": "NadPOS Restoran POS tizimi",
   "author": "Ares Boston Tech LLC",
@@ -37,6 +37,7 @@
     "form-data": "^4.0.5",
     "framer-motion": "^12.23.26",
     "ip": "^2.0.1",
+    "ldrs": "^1.1.9",
     "lucide-react": "^0.555.0",
     "node-cron": "^4.2.1",
     "node-thermal-printer": "^4.5.0",
@@ -102,9 +103,9 @@
       ]
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "oneClick": true,
+      "createDesktopShortcut": true,
+      "artifactName": "NadPOS-Restoran-Setup-${version}.${ext}"
     },
     "publish": {
       "provider": "github",
