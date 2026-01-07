@@ -57,6 +57,7 @@ function registerIpcHandlers(ipcMain) {
 
     ipcMain.handle('get-products', () => productController.getProducts());
     ipcMain.handle('add-product', (e, product) => productController.addProduct(product));
+    ipcMain.handle('update-product', (e, product) => productController.updateProduct(product));
     ipcMain.handle('toggle-product-status', (e, { id, status }) => productController.toggleProductStatus(id, status));
     ipcMain.handle('delete-product', (e, id) => productController.deleteProduct(id));
 

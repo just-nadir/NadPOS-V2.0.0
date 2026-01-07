@@ -46,6 +46,16 @@ module.exports = {
         return res;
     },
 
+    updateProduct: (p) => {
+        const res = db.prepare(`
+            UPDATE products 
+            SET category_id = ?, name = ?, price = ?, destination = ?, unit_type = ?, is_synced = 0, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(p.category_id, p.name, p.price, String(p.destination), p.unit_type || 'item', p.id);
+        notify('products', null);
+        return res;
+    },
+
     toggleProductStatus: (id, status) => {
         const res = db.prepare('UPDATE products SET is_active = ?, is_synced = 0 WHERE id = ?').run(status, id);
         notify('products', null);

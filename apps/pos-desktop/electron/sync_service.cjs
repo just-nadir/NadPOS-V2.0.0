@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const io = require('socket.io-client'); // NEW: Socket.io
 
-const CLOUD_API_URL = 'http://localhost:3000'; // DEV MODE (Was: https://halboldi.uz/api)
+const CLOUD_API_URL = 'http://213.142.148.35:3000'; // VPS MODE (Was: localhost:3000)
 const SYNC_INTERVAL_MS = 60000; // INCREASED to 60s (Polling fallback)
 const PUSH_INTERVAL_MS = 5000; // Check for local changes every 5s
 

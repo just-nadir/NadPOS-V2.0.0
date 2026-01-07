@@ -12,7 +12,7 @@ const ProductModal = ({ isOpen, onClose, onSubmit, newProduct, setNewProduct, ca
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] animate-in fade-in duration-200">
       <div className="bg-background w-[500px] rounded-2xl shadow-2xl p-6 relative border border-border">
         <button onClick={onClose} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground p-2"><X size={24} /></button>
-        <h2 className="text-2xl font-bold text-foreground mb-6">Yangi Taom</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">{newProduct.id ? 'Taomni Tahrirlash' : 'Yangi Taom'}</h2>
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-muted-foreground mb-2">Nomi</label>
@@ -161,7 +161,16 @@ const MenuManagement = () => {
     e.preventDefault();
     try {
       const { ipcRenderer } = window.electron;
-      await ipcRenderer.invoke('add-product', { ...newProduct, price: Number(newProduct.price), category_id: Number(newProduct.category_id) || activeCategory });
+      const productData = { ...newProduct, price: Number(newProduct.price), category_id: Number(newProduct.category_id) || activeCategory };
+
+      if (newProduct.id) {
+        // UPDATE
+        await ipcRenderer.invoke('update-product', productData);
+      } else {
+        // CREATE
+        await ipcRenderer.invoke('add-product', productData);
+      }
+
       setIsModalOpen(false);
       // Reset qilish
       setNewProduct({ name: '', price: '', category_id: '', destination: '1', unit_type: 'item' });
@@ -298,7 +307,10 @@ const MenuManagement = () => {
                 className="w-full pl-12 pr-4 py-3 bg-secondary/30 border border-transparent focus:border-primary focus:bg-background rounded-2xl outline-none text-foreground transition-all text-lg shadow-inner"
               />
             </div>
-            <Button onClick={() => setIsModalOpen(true)} size="lg" className="rounded-2xl shadow-xl shadow-primary/20 gap-3 h-14 px-8 text-lg font-bold hover:scale-105 transition-transform">
+            <Button onClick={() => {
+              setNewProduct(prev => ({ ...prev, category_id: activeCategory || '' }));
+              setIsModalOpen(true);
+            }} size="lg" className="rounded-2xl shadow-xl shadow-primary/20 gap-3 h-14 px-8 text-lg font-bold hover:scale-105 transition-transform">
               <Plus size={24} /> Yangi Taom
             </Button>
           </div>
@@ -374,7 +386,18 @@ const MenuManagement = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="col-span-1 flex justify-end">
+                  <div className="col-span-1 flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:bg-primary/10 hover:text-primary w-12 h-12 rounded-xl transition-all active:scale-95"
+                      onClick={() => {
+                        setNewProduct({ ...product, category_id: product.category_id, destination: String(product.destination) });
+                        setIsModalOpen(true);
+                      }}
+                    >
+                      <Edit2 size={22} />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
