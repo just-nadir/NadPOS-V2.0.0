@@ -157,6 +157,7 @@ function registerIpcHandlers(ipcMain) {
     ipcMain.handle('shift-open', (e, { cashierName, startCash }) => shiftController.openShift(cashierName, startCash));
     ipcMain.handle('shift-close', (e, endCash) => shiftController.closeShift(endCash));
     ipcMain.handle('shift-status', () => shiftController.getShiftStatus());
+    ipcMain.handle('get-shifts', (e, { startDate, endDate }) => shiftController.getShifts(startDate, endDate));
 }
 
 module.exports = registerIpcHandlers;

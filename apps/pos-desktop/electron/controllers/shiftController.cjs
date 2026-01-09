@@ -44,21 +44,38 @@ module.exports = {
             const endTime = new Date().toISOString();
             const shiftId = activeShift.id;
 
-            // Smena davomidagi savdolarni hisoblash (TIZIM)
-            const salesStats = db.prepare(`
-                SELECT 
-                    SUM(total_amount) as total,
-                    SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as cash,
-                    SUM(CASE WHEN payment_method = 'card' THEN total_amount ELSE 0 END) as card,
-                    SUM(CASE WHEN payment_method = 'transfer' THEN total_amount ELSE 0 END) as transfer
-                FROM sales 
-                WHERE shift_id = ?
-            `).get(shiftId);
+            // Smena davomidagi barcha savdolarni olish
+            const sales = db.prepare("SELECT * FROM sales WHERE shift_id = ?").all(shiftId);
 
-            const totalSales = salesStats.total || 0;
-            const totalCash = salesStats.cash || 0;
-            const totalCard = salesStats.card || 0;
-            const totalTransfer = salesStats.transfer || 0;
+            let totalSales = 0;
+            let totalCash = 0;
+            let totalCard = 0;
+            let totalTransfer = 0;
+
+            sales.forEach(sale => {
+                totalSales += sale.total_amount;
+
+                if (sale.payment_method === 'split') {
+                    try {
+                        const parsed = JSON.parse(sale.items_json || '{}');
+                        const details = parsed.paymentDetails || [];
+                        details.forEach(d => {
+                            const amount = d.amount || 0;
+                            if (d.method === 'cash') totalCash += amount;
+                            else if (d.method === 'card') totalCard += amount;
+                            else if (d.method === 'click' || d.method === 'transfer') totalTransfer += amount;
+                        });
+                    } catch (e) {
+                        // Fallback logic could go here, but usually split has details
+                    }
+                } else if (sale.payment_method === 'cash') {
+                    totalCash += sale.total_amount;
+                } else if (sale.payment_method === 'card') {
+                    totalCard += sale.total_amount;
+                } else if (sale.payment_method === 'transfer' || sale.payment_method === 'click') {
+                    totalTransfer += sale.total_amount;
+                }
+            });
 
             // TAFOVUTLARNI HISOBLASH
             // Naqd pul: (Boshlang'ich + Savdo Naqd) vs (Haqiqiy Kassadagi)
@@ -141,5 +158,70 @@ module.exports = {
     getShiftStatus: () => {
         const activeShift = db.prepare("SELECT * FROM shifts WHERE status = 'open'").get();
         return activeShift || null;
+    },
+
+    // Smena tarixini olish
+    getShifts: (startDate, endDate) => {
+        try {
+            if (!startDate || !endDate) {
+                return db.prepare('SELECT * FROM shifts ORDER BY start_time DESC LIMIT 50').all();
+            }
+
+            const query = `
+                SELECT * FROM shifts 
+                WHERE datetime(start_time, 'localtime') >= datetime(?) 
+                  AND datetime(start_time, 'localtime') <= datetime(?)
+                ORDER BY start_time DESC
+            `;
+            const shifts = db.prepare(query).all(startDate, endDate);
+
+            // Recalculate totals for each shift to ensure accuracy
+            return shifts.map(shift => {
+                const sales = db.prepare("SELECT * FROM sales WHERE shift_id = ?").all(shift.id);
+                let totalCash = 0;
+                let totalCard = 0;
+                let totalTransfer = 0;
+                let totalDebt = 0;
+                let totalSales = 0; // Recalculate total sales too just in case
+
+                sales.forEach(sale => {
+                    totalSales += sale.total_amount;
+
+                    if (sale.payment_method === 'split') {
+                        try {
+                            const parsed = JSON.parse(sale.items_json || '{}');
+                            const details = parsed.paymentDetails || [];
+                            details.forEach(d => {
+                                const amount = d.amount || 0;
+                                if (d.method === 'cash') totalCash += amount;
+                                else if (d.method === 'card') totalCard += amount;
+                                else if (d.method === 'click' || d.method === 'transfer') totalTransfer += amount;
+                                else if (d.method === 'debt') totalDebt += amount;
+                            });
+                        } catch (e) { }
+                    } else if (sale.payment_method === 'cash') {
+                        totalCash += sale.total_amount;
+                    } else if (sale.payment_method === 'card') {
+                        totalCard += sale.total_amount;
+                    } else if (sale.payment_method === 'debt') {
+                        totalDebt += sale.total_amount;
+                    } else if (sale.payment_method === 'transfer' || sale.payment_method === 'click') {
+                        totalTransfer += sale.total_amount;
+                    }
+                });
+
+                return {
+                    ...shift,
+                    total_sales: totalSales,
+                    total_cash: totalCash,
+                    total_card: totalCard,
+                    total_transfer: totalTransfer,
+                    total_debt: totalDebt
+                };
+            });
+        } catch (err) {
+            log.error("getShifts xatosi:", err);
+            throw err;
+        }
     }
 };

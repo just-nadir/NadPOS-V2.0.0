@@ -6,7 +6,7 @@ import {
 import {
   LayoutDashboard, Users, UtensilsCrossed, History, Calendar,
   Filter, TrendingUp, DollarSign, CreditCard,
-  ShoppingBag, Trash2, ArrowUpRight, ArrowDownRight, Printer
+  ShoppingBag, Trash2, ArrowUpRight, ArrowDownRight, Printer, Clock
 } from 'lucide-react';
 import { useGlobal } from '../context/GlobalContext';
 import { formatDate, formatTime, formatDateTime } from '../utils/dateUtils';
@@ -46,6 +46,7 @@ const Reports = () => {
   const [salesData, setSalesData] = useState([]);
   const [trendData, setTrendData] = useState([]);
   const [cancelledData, setCancelledData] = useState([]);
+  const [shiftsData, setShiftsData] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [dateRange, setDateRange] = useState({
@@ -67,15 +68,17 @@ const Reports = () => {
         endDate: `${dateRange.endDate}T23:59:59.999Z`
       };
 
-      const [sData, cData, tData] = await Promise.all([
+      const [sData, cData, tData, shifts] = await Promise.all([
         ipcRenderer.invoke('get-sales', range),
         ipcRenderer.invoke('get-cancelled-orders', range),
-        ipcRenderer.invoke('get-sales-trend', range)
+        ipcRenderer.invoke('get-sales-trend', range),
+        ipcRenderer.invoke('get-shifts', range)
       ]);
 
       setSalesData(sData || []);
       setCancelledData(cData || []);
       setTrendData(tData || []);
+      setShiftsData(shifts || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -100,7 +103,25 @@ const Reports = () => {
       const serviceCharge = amount - subtotal + discount;
 
       const method = sale.payment_method || 'naqd';
-      methodMap[method] = (methodMap[method] || 0) + amount;
+
+      if (method === 'split') {
+        try {
+          const parsed = JSON.parse(sale.items_json || '{}');
+          if (parsed.paymentDetails && Array.isArray(parsed.paymentDetails)) {
+            parsed.paymentDetails.forEach(d => {
+              const m = d.method || 'boshqa';
+              methodMap[m] = (methodMap[m] || 0) + (d.amount || 0);
+            });
+          } else {
+            // Fallback if structure is missing
+            methodMap['split'] = (methodMap['split'] || 0) + amount;
+          }
+        } catch (e) {
+          methodMap['split'] = (methodMap['split'] || 0) + amount;
+        }
+      } else {
+        methodMap[method] = (methodMap[method] || 0) + amount;
+      }
 
       const waiter = sale.waiter_name || "Noma'lum";
       if (!waiterMap[waiter]) {
@@ -118,7 +139,16 @@ const Reports = () => {
       }
 
       try {
-        const items = JSON.parse(sale.items_json || '[]');
+        let items = [];
+        const parsed = JSON.parse(sale.items_json || '[]');
+
+        // Handle split payment structure { items: [], paymentDetails: [] }
+        if (parsed.items && Array.isArray(parsed.items)) {
+          items = parsed.items;
+        } else if (Array.isArray(parsed)) {
+          items = parsed;
+        }
+
         items.forEach(item => {
           const pName = item.product_name || item.name;
           if (!productMap[pName]) productMap[pName] = { name: pName, qty: 0, revenue: 0 };
@@ -423,21 +453,51 @@ const Reports = () => {
         )
       },
       { label: "Ofitsiant", key: "waiter_name", cellClassName: "font-medium text-foreground", render: (s) => s.waiter_name || "Kassir" },
-      { label: "Mehmon", key: "guest_count", className: "text-center", headerAlign: "justify-center", cellClassName: "text-center text-sm font-bold text-primary", render: (s) => s.guest_count || '-' },
       { label: "Mijoz", key: "customer_id", cellClassName: "text-sm text-muted-foreground", render: (s) => s.customer_id ? "Mijoz mavjud" : "-" },
       {
         label: "To'lov Turi",
         key: "payment_method",
-        render: (s) => (
-          <span className={cn(
-            "px-2.5 py-1 rounded-md text-xs font-bold uppercase border",
-            s.payment_method === 'cash' ? "bg-green-500/10 text-green-600 border-green-500/20" :
-              s.payment_method === 'card' ? "bg-blue-500/10 text-blue-600 border-blue-500/20" :
-                s.payment_method === 'debt' ? "bg-red-500/10 text-red-600 border-red-500/20" : "bg-secondary text-muted-foreground border-border"
-          )}>
-            {s.payment_method === 'cash' ? 'Naqd' : s.payment_method === 'card' ? 'Karta' : s.payment_method === 'debt' ? 'Nasiya' : s.payment_method}
-          </span>
-        )
+        render: (s) => {
+          if (s.payment_method === 'split') {
+            try {
+              const parsed = JSON.parse(s.items_json || '{}');
+              const details = parsed.paymentDetails || [];
+
+              return (
+                <div className="flex flex-col gap-1.5 items-start">
+                  {details.map((d, idx) => (
+                    <span
+                      key={idx}
+                      className={cn(
+                        "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border flex items-center gap-1.5",
+                        d.method === 'cash' ? "bg-green-500/10 text-green-700 border-green-500/20 dark:text-green-500" :
+                          d.method === 'card' ? "bg-blue-500/10 text-blue-700 border-blue-500/20 dark:text-blue-500" :
+                            d.method === 'debt' ? "bg-red-500/10 text-red-700 border-red-500/20 dark:text-red-500" :
+                              "bg-secondary text-muted-foreground border-border"
+                      )}
+                    >
+                      <span>{d.method === 'cash' ? 'Naqd' : d.method === 'card' ? 'Karta' : d.method === 'click' ? 'Click' : d.method}:</span>
+                      <span className="font-black opacity-80">{(d.amount || 0).toLocaleString()}</span>
+                    </span>
+                  ))}
+                </div>
+              );
+            } catch (e) {
+              return <span className="bg-secondary px-2 py-1 rounded text-xs">Split</span>;
+            }
+          }
+
+          return (
+            <span className={cn(
+              "px-2.5 py-1 rounded-md text-xs font-bold uppercase border",
+              s.payment_method === 'cash' ? "bg-green-500/10 text-green-600 border-green-500/20" :
+                s.payment_method === 'card' ? "bg-blue-500/10 text-blue-600 border-blue-500/20" :
+                  s.payment_method === 'debt' ? "bg-red-500/10 text-red-600 border-red-500/20" : "bg-secondary text-muted-foreground border-border"
+            )}>
+              {s.payment_method === 'cash' ? 'Naqd' : s.payment_method === 'card' ? 'Karta' : s.payment_method === 'debt' ? 'Nasiya' : s.payment_method}
+            </span>
+          );
+        }
       },
       { label: "Summa", key: "total_amount", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-black text-foreground", render: (s) => s.total_amount?.toLocaleString() }
 
@@ -474,6 +534,56 @@ const Reports = () => {
       { label: "Summa", key: "total_amount", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-black text-foreground", render: (o) => o.total_amount?.toLocaleString() }
     ];
     return <SortableTable columns={columns} data={cancelledData} emptyMessage="Bekor qilingan buyurtmalar yo'q" />;
+  };
+
+  const renderShifts = () => {
+    const columns = [
+      {
+        label: "Kassir",
+        key: "cashier_name",
+        render: (s) => (
+          <div className="font-bold text-foreground flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold text-muted-foreground">
+              {(s.cashier_name || 'K').charAt(0)}
+            </div>
+            {s.cashier_name || "Noma'lum"}
+          </div>
+        )
+      },
+      {
+        label: "Ochilishi",
+        key: "start_time",
+        render: (s) => (
+          <div className="text-sm">
+            <div className="font-bold text-foreground">{formatTime(s.start_time)}</div>
+            <div className="text-xs text-muted-foreground">{formatDate(s.start_time)}</div>
+          </div>
+        )
+      },
+      {
+        label: "Yopilishi",
+        key: "end_time",
+        render: (s) => s.end_time ? (
+          <div className="text-sm">
+            <div className="font-bold text-foreground">{formatTime(s.end_time)}</div>
+            <div className="text-xs text-muted-foreground">{formatDate(s.end_time)}</div>
+          </div>
+        ) : <span className="bg-green-500/10 text-green-600 px-2 py-1 rounded text-xs font-bold uppercase">Ochiq</span>
+      },
+      { label: "Naqd", key: "total_cash", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-medium text-muted-foreground", render: (s) => (s.total_cash || 0).toLocaleString() },
+      { label: "Karta", key: "total_card", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-medium text-muted-foreground", render: (s) => (s.total_card || 0).toLocaleString() },
+      { label: "Click", key: "total_transfer", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-medium text-muted-foreground", render: (s) => (s.total_transfer || 0).toLocaleString() },
+      {
+        label: "Qarz",
+        key: "debt",
+        className: "text-right",
+        headerAlign: "justify-end",
+        cellClassName: "text-right font-medium text-red-500",
+        render: (s) => (s.total_debt || 0).toLocaleString()
+      },
+      { label: "Jami Savdo", key: "total_sales", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-black text-foreground", render: (s) => (s.total_sales || 0).toLocaleString() }
+    ];
+    return <SortableTable columns={columns} data={shiftsData} emptyMessage="Smenalar tarixi topilmadi" />;
   };
 
   return (
@@ -519,6 +629,7 @@ const Reports = () => {
               { id: 'staff', icon: Users, label: "Xodimlar" },
               { id: 'products', icon: UtensilsCrossed, label: "Menyu" },
               { id: 'history', icon: History, label: "Tranzaksiyalar" },
+              { id: 'shifts', icon: Clock, label: "Smenalar" },
               { id: 'trash', icon: Trash2, label: "Bekor Qilingan" },
             ].map(tab => (
               <button
@@ -548,6 +659,7 @@ const Reports = () => {
               {activeTab === 'staff' && "Xodimlar Samaradorligi"}
               {activeTab === 'products' && "Menyu Reytingi"}
               {activeTab === 'history' && "Savdo Tarixi"}
+              {activeTab === 'shifts' && "Smenalar Tarixi"}
               {activeTab === 'trash' && "Bekor Qilinganlar"}
             </h1>
             <p className="text-muted-foreground text-sm font-bold mt-1 flex items-center gap-2 bg-secondary/30 px-3 py-1 rounded-lg w-fit">
@@ -574,6 +686,7 @@ const Reports = () => {
             {activeTab === 'staff' && renderStaff()}
             {activeTab === 'products' && renderProducts()}
             {activeTab === 'history' && renderHistory()}
+            {activeTab === 'shifts' && renderShifts()}
             {activeTab === 'trash' && renderCancelledOrders()}
           </div>
         </div>

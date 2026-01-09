@@ -1,7 +1,7 @@
 {
   "name": "pos-desktop",
   "private": true,
-  "version": "2.1.4",
+  "version": "2.2.0",
   "main": "electron/main.cjs",
   "description": "NadPOS Restoran POS tizimi",
   "author": "Ares Boston Tech LLC",
