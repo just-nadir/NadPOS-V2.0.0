@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users, Clock, Receipt, Hash, User, Search, ArrowRight
+  Users, Clock, Receipt, Hash, User, Search, ArrowRight, Calendar
 } from 'lucide-react';
 import { useIpcListener } from '../hooks/useIpcListener';
 import { useGlobal } from '../context/GlobalContext';
@@ -15,6 +15,7 @@ import { Button } from './ui/button';
 import MenuModal from './MenuModal';
 
 
+
 // --- NEW ORDER MODAL ---
 
 
@@ -27,6 +28,7 @@ const TablesGrid = ({ onSelectTable, selectedTableId }) => { // Accepted selecte
   // Modal State
   const [menuModal, setMenuModal] = useState({ isOpen: false, table: null });
 
+
   const { settings } = useGlobal();
 
   const loadData = async () => {
@@ -34,7 +36,7 @@ const TablesGrid = ({ onSelectTable, selectedTableId }) => { // Accepted selecte
       if (window.electron && window.electron.ipcRenderer) {
         const [hallsData, tablesData] = await Promise.all([
           window.electron.ipcRenderer.invoke('get-halls'),
-          window.electron.ipcRenderer.invoke('get-tables')
+          window.electron.ipcRenderer.invoke('get-tables'),
         ]);
 
         setHalls(hallsData || []);
@@ -126,6 +128,7 @@ const TablesGrid = ({ onSelectTable, selectedTableId }) => { // Accepted selecte
       <div className="p-4 border-b border-border bg-card shrink-0 shadow-sm z-20">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-black tracking-tight text-foreground">Stollar</h1>
+
           <Button
             variant={showFree ? "default" : "outline"}
             size="lg"
@@ -250,6 +253,8 @@ const TablesGrid = ({ onSelectTable, selectedTableId }) => { // Accepted selecte
         tableId={menuModal.table?.id}
         tableName={menuModal.table?.name}
       />
+
+
     </div>
   );
 };

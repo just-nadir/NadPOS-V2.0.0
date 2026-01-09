@@ -11,6 +11,7 @@ const staffController = require('./controllers/staffController.cjs');
 const userController = require('./controllers/userController.cjs'); // Customers & Debtors
 
 const inventoryController = require('./controllers/inventoryController.cjs'); // YANGI
+
 const printerService = require('./services/printerService.cjs');
 // const licenseController = require('./controllers/licenseController.cjs'); // License System (REMOVED)
 
@@ -72,6 +73,8 @@ function registerIpcHandlers(ipcMain) {
 
     // Tarix (Eski tarix ham ishlataveramiz)
     ipcMain.handle('get-stock-history', () => productController.getStockHistory());
+
+
 
     // ==========================================
     // 4. ORDERS & CHECKOUT (Buyurtma va To'lov)

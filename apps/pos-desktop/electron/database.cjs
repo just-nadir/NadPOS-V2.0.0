@@ -309,9 +309,39 @@ function createV2Tables() {
         server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`).run();
 
+    // 2.3 Bronlar (Reservations)
+    db.prepare(`CREATE TABLE IF NOT EXISTS reservations (
+        id TEXT PRIMARY KEY,
+        table_id TEXT,
+        customer_name TEXT,
+        customer_phone TEXT,
+        reservation_time TEXT, -- IOS 8601 date string
+        guests INTEGER DEFAULT 1,
+        note TEXT,
+        status TEXT DEFAULT 'active', -- 'active' | 'completed' | 'cancelled'
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP, deleted_at TEXT,
+        FOREIGN KEY(table_id) REFERENCES tables(id) ON DELETE CASCADE
+    )`).run();
+
+    // Hotfix: Add restaurant_id if missing in reservations (for local dev iterations)
+    try {
+        db.prepare("ALTER TABLE reservations ADD COLUMN restaurant_id TEXT").run();
+    } catch (e) { /* Column likely exists */ }
+
+    // Hotfix: Add guests if missing (Fix for 'no column named guests' error)
+    try {
+        db.prepare("ALTER TABLE reservations ADD COLUMN guests INTEGER DEFAULT 1").run();
+    } catch (e) { /* Column likely exists */ }
+
+    // Hotfix: Add note if missing (Fix for 'no column named note' error)
+    try {
+        db.prepare("ALTER TABLE reservations ADD COLUMN note TEXT").run();
+    } catch (e) { /* Column likely exists */ }
+
     // --- Indexes (Updated) ---
     // Indexes need valid syntax. createV2Tables calls run multiple times.
-    const tablesList = ['tables', 'products', 'order_items', 'sales', 'sale_items', 'debt_history', 'customer_debts', 'customers'];
+    const tablesList = ['tables', 'products', 'order_items', 'sales', 'sale_items', 'debt_history', 'customer_debts', 'customers', 'reservations'];
 
     // Simple Index creations
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_tables_status ON tables(status)`).run();
@@ -330,6 +360,11 @@ function createV2Tables() {
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_customers_type ON customers(type)`).run();
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active)`).run();
 
+    // Reservations Indexes
+    db.prepare(`CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(reservation_time)`).run();
+    db.prepare(`CREATE INDEX IF NOT EXISTS idx_reservations_table ON reservations(table_id)`).run();
+    db.prepare(`CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status)`).run();
+
     // Performance Sync Indexes
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_sales_sync ON sales(is_synced)`).run();
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_products_sync ON products(is_synced)`).run();
@@ -342,7 +377,7 @@ function createV2Tables() {
     const tablesToSync = [
         'users', 'kitchens', 'halls', 'tables', 'categories', 'products', 'customers', 'shifts',
         'sales', 'sale_items', 'order_items', 'debt_history', 'customer_debts', 'cancelled_orders', 'settings',
-        'sms_templates', 'sms_logs', 'supplies', 'supply_items'
+        'sms_templates', 'sms_logs', 'supplies', 'supply_items', 'reservations'
     ];
 
     for (const tbl of tablesToSync) {

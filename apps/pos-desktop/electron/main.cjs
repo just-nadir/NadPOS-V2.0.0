@@ -26,15 +26,6 @@ if (app) {
 }
 
 function createWindow() {
-  try {
-    initDB();
-    startServer();
-    registerIpcHandlers(ipcMain); // Handlerlar ro'yxatdan o'tdi
-    log.info("Dastur ishga tushdi. Baza, Server yondi.");
-  } catch (err) {
-    log.error("Boshlang'ich yuklashda xato:", err);
-  }
-
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -80,6 +71,15 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  try {
+    initDB();
+    startServer();
+    registerIpcHandlers(ipcMain); // Handlerlar faqat BIR MARTA ro'yxatdan o'tadi
+    log.info("Dastur ishga tushdi. Baza, Server yondi.");
+  } catch (err) {
+    log.error("Boshlang'ich yuklashda xato:", err);
+  }
+
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
