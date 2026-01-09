@@ -20,6 +20,7 @@ const SaleDetailModal = ({ isOpen, onClose, sale, checkNumber }) => {
     if (!sale) return null;
 
     let items = [];
+    let paymentDetails = [];
     try {
         if (Array.isArray(sale.items)) {
             items = sale.items;
@@ -28,10 +29,24 @@ const SaleDetailModal = ({ isOpen, onClose, sale, checkNumber }) => {
             if (!Array.isArray(items)) {
                 // Handle case where items is an object (e.g. split payment { items: [], paymentDetails: [] })
                 if (items && Array.isArray(items.items)) {
+                    // Extract payment details if available
+                    if (Array.isArray(items.paymentDetails)) {
+                        paymentDetails = items.paymentDetails;
+                    }
                     items = items.items;
                 } else {
                     items = [];
                 }
+            }
+        } else if (typeof sale.items === 'object' && sale.items !== null) {
+            // Handle case where items is already parsed object
+            if (Array.isArray(sale.items.items)) {
+                items = sale.items.items;
+                if (Array.isArray(sale.items.paymentDetails)) {
+                    paymentDetails = sale.items.paymentDetails;
+                }
+            } else {
+                items = []; // Or handle as direct object map if needed, but usually it's items array
             }
         }
     } catch (e) {
@@ -90,6 +105,26 @@ const SaleDetailModal = ({ isOpen, onClose, sale, checkNumber }) => {
                         </span>
                     </div>
                 </div>
+
+                {paymentDetails.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-border">
+                        <h4 className="font-bold text-sm text-muted-foreground mb-2">To'lovlar Tarixi</h4>
+                        <div className="space-y-1">
+                            {paymentDetails.map((pd, idx) => (
+                                <div key={idx} className="flex justify-between text-sm">
+                                    <span className="capitalize text-muted-foreground">
+                                        {pd.method === 'cash' ? 'Naqd' :
+                                            pd.method === 'card' ? 'Karta' :
+                                                pd.method === 'click' ? 'Click' :
+                                                    pd.method === 'transfer' ? 'P/P' :
+                                                        pd.method === 'debt' ? 'Nasiya' : pd.method}
+                                    </span>
+                                    <span className="font-medium text-foreground">{formatCurrency(pd.amount)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </DialogContent>
         </Dialog>
     );

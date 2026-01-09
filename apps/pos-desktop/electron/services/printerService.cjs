@@ -48,7 +48,7 @@ function createHtmlTemplate(bodyContent) {
                 padding: 0;
                 font-size: 13px;
                 color: #000000;
-                line-height: 1.4;
+                line-height: 1.1; /* Reduced from 1.4 */
             }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
@@ -57,33 +57,31 @@ function createHtmlTemplate(bodyContent) {
             .uppercase { text-transform: uppercase; }
             
             /* Chiziqlar */
-            .line { border-bottom: 1.5px solid #000000; margin: 8px 0; }
-            .double-line { border-bottom: 3.5px double #000000; margin: 8px 0; }
+            .line { border-bottom: 1.5px solid #000000; margin: 2px 0; } /* Reduced from 8px */
+            .double-line { border-bottom: 2px solid #000000; margin: 2px 0; } /* Changed to single thick line */
             
             .flex { display: flex; justify-content: space-between; }
-            .mb-1 { margin-bottom: 5px; }
+            .mb-1 { margin-bottom: 2px; } /* Reduced from 5px */
             
             /* Sarlavha */
-            .header-title { font-size: 18px; margin-bottom: 5px; font-weight: bold; }
-            .header-info { font-size: 12px; margin-bottom: 2px; }
+            .header-title { font-size: 18px; margin-bottom: 2px; font-weight: bold; } /* Reduced from 5px */
+            .header-info { font-size: 12px; margin-bottom: 0px; } /* Reduced from 2px */
             
             /* Jadval */
-            table { width: 100%; border-collapse: collapse; margin: 5px 0; }
-            td { vertical-align: top; padding: 4px 0; }
-            .col-name { text-align: left; width: 35%; }
-            .col-qty { text-align: center; width: 12%; }
-            .col-unit-price { text-align: right; width: 25%; }
-            .col-total { text-align: right; width: 28%; }
+            table { width: 100%; border-collapse: collapse; margin: 2px 0; border: 1px solid #000; } /* Reduced margin from 5px */
+            td { vertical-align: middle; padding: 2px; border: 1px solid #000; word-wrap: break-word; } /* Reduced padding from 4px */
+            .col-name { text-align: left; width: 46%; } /* Increased from 35% */
+            .col-qty { text-align: center; width: 10%; } /* Reduced from 12% */
+            .col-unit-price { text-align: right; width: 22%; font-size: 12px; } /* Reduced from 25% */
+            .col-total { text-align: right; width: 22%; font-size: 12px; } /* Reduced from 28% */
             
             /* Jami hisob */
-            .total-row { font-size: 16px; font-weight: bold; margin-top: 5px; }
-            .footer-msg { font-size: 12px; margin-top: 10px; font-weight: bold; }
+            .total-row { font-size: 16px; font-weight: bold; margin-top: 2px; } /* Reduced from 5px */
+            .footer-msg { font-size: 12px; margin-top: 5px; font-weight: bold; } /* Reduced from 10px */
         </style>
     </head>
     <body>
         ${bodyContent}
-        <br/>
-        <div class="text-center">.</div> 
     </body>
     </html>
     `;
@@ -171,17 +169,16 @@ module.exports = {
         let qrCodeHtml = '';
         if (settings.qr_link) {
             try {
-                const qrDataUrl = await QRCode.toDataURL(settings.qr_link, {
+                let qrUrl = settings.qr_link.trim();
+                if (!qrUrl.startsWith('http://') && !qrUrl.startsWith('https://')) {
+                    qrUrl = `https://${qrUrl}`;
+                }
+                const qrDataUrl = await QRCode.toDataURL(qrUrl, {
                     margin: 1,
                     width: 120,
                     color: { dark: '#000000', light: '#ffffff' }
                 });
-                qrCodeHtml = `
-                    <div class="text-center" style="margin-top: 15px;">
-                        <img src="${qrDataUrl}" style="width: 100px; height: 100px; border: 1px solid #eee;" />
-                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Bizni ijtimoiy tarmoqlarda kuzating</div>
-                    </div>
-                `;
+                qrCodeHtml = `<img src="${qrDataUrl}" style="width: 100%; max-width: 80px; height: auto; border: 1px solid #eee;" />`;
             } catch (qrErr) {
                 log.error("QR kod yaratishda xato:", qrErr);
             }
@@ -197,26 +194,18 @@ module.exports = {
             <div class="double-line"></div>
             
             <div class="flex">
-                <span>Chek:</span>
-                <span class="bold"># ${checkNum}</span>
-            </div>
-            <div class="flex">
-                <span>Sana:</span>
-                <span>${formatDateTime()}</span>
-            </div>
-            <div class="flex">
-                <span>Stol:</span>
-                <span class="bold">${orderData.tableName}</span>
+                <div class="text-left">Chek: <span class="bold"># ${checkNum}</span></div>
+                <div class="text-right">${formatDateTime()}</div>
             </div>
             <div class="flex" style="margin-top: 2px;">
-                <span>Ofitsiant:</span>
-                <span class="bold uppercase" style="font-size: 14px;">${waiterName}</span>
+                <div class="text-left">Stol: <span class="bold">${orderData.tableName}</span></div>
+                <div class="text-right">Ofitsiant: <span class="bold uppercase">${waiterName}</span></div>
             </div>
 
             <div class="line"></div>
 
             <table>
-                <tr style="border-bottom: 1.5px solid #000;">
+                <tr>
                     <td class="col-name bold">Nomi</td>
                     <td class="col-qty bold">Soni</td>
                     <td class="col-unit-price bold">Narxi</td>
@@ -245,16 +234,19 @@ module.exports = {
 
             <div class="double-line"></div>
 
-            <div class="flex total-row">
-                <span>JAMI:</span>
-                <span>${orderData.total.toLocaleString()} so'm</span>
+            <div class="flex" style="align-items: center; margin-top: 5px;">
+                <div style="width: 40%; text-align: left;">
+                    ${qrCodeHtml}
+                </div>
+                <div style="width: 60%; text-align: right;">
+                    <div class="total-row" style="margin-top: 0;">
+                        <span>JAMI: ${orderData.total.toLocaleString()}</span>
+                    </div>
+                    <div class="footer-msg" style="margin-top: 5px;">
+                        ${footerText}
+                    </div>
+                </div>
             </div>
-
-            <div class="text-center footer-msg">
-                ${footerText}
-            </div>
-
-            ${qrCodeHtml}
         `;
 
         const fullHtml = createHtmlTemplate(content);
@@ -285,17 +277,16 @@ module.exports = {
         let qrCodeHtml = '';
         if (settings.qr_link) {
             try {
-                const qrDataUrl = await QRCode.toDataURL(settings.qr_link, {
+                let qrUrl = settings.qr_link.trim();
+                if (!qrUrl.startsWith('http://') && !qrUrl.startsWith('https://')) {
+                    qrUrl = `https://${qrUrl}`;
+                }
+                const qrDataUrl = await QRCode.toDataURL(qrUrl, {
                     margin: 1,
                     width: 120,
                     color: { dark: '#000000', light: '#ffffff' }
                 });
-                qrCodeHtml = `
-                    <div class="text-center" style="margin-top: 15px;">
-                        <img src="${qrDataUrl}" style="width: 100px; height: 100px; border: 1px solid #eee;" />
-                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Menyuni ko'rish uchun skanerlang</div>
-                    </div>
-                `;
+                qrCodeHtml = `<img src="${qrDataUrl}" style="width: 100%; max-width: 80px; height: auto; border: 1px solid #eee;" />`;
             } catch (qrErr) {
                 log.error("QR kod yaratishda xato:", qrErr);
             }
@@ -318,26 +309,18 @@ module.exports = {
             <div class="line"></div>
             
             <div class="flex">
-                <span>Chek:</span>
-                <span class="bold"># ${checkNum}</span>
-            </div>
-            <div class="flex">
-                <span>Sana:</span>
-                <span>${formatDateTime()}</span>
-            </div>
-            <div class="flex">
-                <span>Stol:</span>
-                <span class="bold">${billData.tableName}</span>
+                <div class="text-left">Chek: <span class="bold"># ${checkNum}</span></div>
+                <div class="text-right">${formatDateTime()}</div>
             </div>
             <div class="flex" style="margin-top: 2px;">
-                <span>Ofitsiant:</span>
-                <span class="bold uppercase" style="font-size: 14px;">${waiterName}</span>
+                <div class="text-left">Stol: <span class="bold">${billData.tableName}</span></div>
+                <div class="text-right">Ofitsiant: <span class="bold uppercase">${waiterName}</span></div>
             </div>
 
             <div class="line"></div>
 
             <table>
-                <tr style="border-bottom: 1.5px solid #000;">
+                <tr>
                     <td class="col-name bold">Nomi</td>
                     <td class="col-qty bold">Soni</td>
                     <td class="col-unit-price bold">Narxi</td>
@@ -360,17 +343,20 @@ module.exports = {
 
             <div class="double-line"></div>
 
-            <div class="flex total-row">
-                <span>JAMI:</span>
-                <span>${billData.total.toLocaleString()} so'm</span>
+            <div class="flex" style="align-items: center; margin-top: 5px;">
+                <div style="width: 40%; text-align: left;">
+                    ${qrCodeHtml}
+                </div>
+                <div style="width: 60%; text-align: right;">
+                    <div class="total-row" style="margin-top: 0;">
+                        <span>JAMI: ${billData.total.toLocaleString()}</span>
+                    </div>
+                    <div class="footer-msg" style="margin-top: 5px;">
+                        <div>Yoqimli ishtaxa!</div>
+                        <div style="font-size: 11px; margin-top: 2px;">(To'lov qilinmadi)</div>
+                    </div>
+                </div>
             </div>
-
-            <div class="text-center footer-msg" style="margin-top: 15px; border-top: 1.5px solid #000; padding-top: 10px;">
-                <div>Yoqimli ishtaxa!</div>
-                <div style="font-size: 11px; margin-top: 5px;">(To'lov qilinmadi)</div>
-            </div>
-
-            ${qrCodeHtml}
         `;
 
         const fullHtml = createHtmlTemplate(content);
