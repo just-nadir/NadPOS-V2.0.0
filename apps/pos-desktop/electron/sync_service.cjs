@@ -155,10 +155,12 @@ async function pushChanges() {
                         clean.stock = Number(clean.stock.toFixed(4));
                     }
 
-                    // Normalize Dates (updated_at, created_at, deleted_at, date, due_date)
-                    const dateFields = ['updated_at', 'created_at', 'deleted_at', 'date', 'due_date'];
+                    // Normalize Dates (updated_at, created_at, deleted_at, date, due_date, birthday, reservation_time)
+                    const dateFields = ['updated_at', 'created_at', 'deleted_at', 'date', 'due_date', 'birthday', 'reservation_time', 'last_sms_date'];
                     for (const field of dateFields) {
-                        if (clean[field]) {
+                        if (clean[field] === '') {
+                            clean[field] = null;
+                        } else if (clean[field]) {
                             try {
                                 const d = new Date(clean[field]);
                                 if (!isNaN(d.getTime())) {
