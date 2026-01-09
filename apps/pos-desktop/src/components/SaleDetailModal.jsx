@@ -25,7 +25,14 @@ const SaleDetailModal = ({ isOpen, onClose, sale, checkNumber }) => {
             items = sale.items;
         } else if (typeof sale.items === 'string') {
             items = JSON.parse(sale.items);
-            if (!Array.isArray(items)) items = [];
+            if (!Array.isArray(items)) {
+                // Handle case where items is an object (e.g. split payment { items: [], paymentDetails: [] })
+                if (items && Array.isArray(items.items)) {
+                    items = items.items;
+                } else {
+                    items = [];
+                }
+            }
         }
     } catch (e) {
         console.error("Error parsing sale items:", e);

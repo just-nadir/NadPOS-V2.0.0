@@ -509,6 +509,25 @@ module.exports = {
         }
     },
 
+    getSalesByShift: (shiftId) => {
+        try {
+            log.info("getSalesByShift called for ID:", shiftId);
+            const query = `
+                SELECT s.*, c.name as customer_name 
+                FROM sales s
+                LEFT JOIN customers c ON s.customer_id = c.id
+                WHERE s.shift_id = ? 
+                ORDER BY s.date DESC
+            `;
+            const sales = db.prepare(query).all(shiftId);
+            log.info(`Found ${sales.length} sales for shift ${shiftId}`);
+            return sales;
+        } catch (err) {
+            log.error("getSalesByShift xatosi:", err);
+            return [];
+        }
+    },
+
     removeItem: (itemId) => {
         try {
             const removeTransaction = db.transaction(() => {

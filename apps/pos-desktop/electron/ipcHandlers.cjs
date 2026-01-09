@@ -119,6 +119,7 @@ function registerIpcHandlers(ipcMain) {
 
     // Hisobotlar uchun
     ipcMain.handle('get-sales', (e, { startDate, endDate }) => orderController.getSales(startDate, endDate));
+    ipcMain.handle('get-sales-by-shift', (e, shiftId) => orderController.getSalesByShift(shiftId));
     ipcMain.handle('get-sales-trend', (e, { startDate, endDate } = {}) => orderController.getSalesTrend(startDate, endDate)); // YANGI (Dynamic)
     ipcMain.handle('get-cancelled-orders', (e, { startDate, endDate }) => orderController.getCancelledOrders(startDate, endDate));
     ipcMain.handle('get-sale-details', (e, saleId) => orderController.getSaleDetails(saleId));

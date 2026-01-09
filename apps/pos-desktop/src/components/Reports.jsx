@@ -6,12 +6,14 @@ import {
 import {
   LayoutDashboard, Users, UtensilsCrossed, History, Calendar,
   Filter, TrendingUp, DollarSign, CreditCard,
-  ShoppingBag, Trash2, ArrowUpRight, ArrowDownRight, Printer, Clock
+  ShoppingBag, Trash2, ArrowUpRight, ArrowDownRight, Printer, Clock,
+  ChevronLeft, Search
 } from 'lucide-react';
 import { useGlobal } from '../context/GlobalContext';
 import { formatDate, formatTime, formatDateTime } from '../utils/dateUtils';
 import { cn } from '../utils/cn';
 import { Button } from './ui/button';
+import SaleDetailModal from './SaleDetailModal';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1'];
 
@@ -47,6 +49,10 @@ const Reports = () => {
   const [trendData, setTrendData] = useState([]);
   const [cancelledData, setCancelledData] = useState([]);
   const [shiftsData, setShiftsData] = useState([]);
+  const [selectedShift, setSelectedShift] = useState(null);
+  const [shiftSales, setShiftSales] = useState([]);
+  const [selectedSale, setSelectedSale] = useState(null);
+  const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [dateRange, setDateRange] = useState({
@@ -81,6 +87,27 @@ const Reports = () => {
       setShiftsData(shifts || []);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadShiftDetails = async (shift) => {
+    console.log("loadShiftDetails called for shift:", shift);
+    if (!window.electron) {
+      console.error("Window.electron is missing!");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { ipcRenderer } = window.electron;
+      console.log("Invoking get-sales-by-shift...");
+      const sales = await ipcRenderer.invoke('get-sales-by-shift', shift.id);
+      console.log("Sales received:", sales);
+      setShiftSales(sales || []);
+      setSelectedShift(shift);
+    } catch (err) {
+      console.error("loadShiftDetails error:", err);
     } finally {
       setLoading(false);
     }
@@ -336,7 +363,18 @@ const Reports = () => {
     </div>
   );
 
-  const SortableTable = ({ columns, data, emptyMessage }) => {
+  const handleSaleClick = (sale) => {
+    // Normalize data structure for Modal if needed
+    const modalData = {
+      ...sale,
+      amount: sale.total_amount,
+      items: sale.items_json // Passed as generic items JSON string or object
+    };
+    setSelectedSale(modalData);
+    setIsSaleModalOpen(true);
+  };
+
+  const SortableTable = ({ columns, data, emptyMessage, onRowDoubleClick }) => {
     const sortedData = getSortedData(data, sortConfig);
 
     return (
@@ -374,7 +412,11 @@ const Reports = () => {
             </thead>
             <tbody className="divide-y divide-border">
               {sortedData.length > 0 ? sortedData.map((row, rowIndex) => (
-                <tr key={rowIndex} className="hover:bg-muted/50 transition-colors">
+                <tr
+                  key={rowIndex}
+                  className={cn("hover:bg-muted/50 transition-colors", onRowDoubleClick && "cursor-pointer active:bg-muted/70")}
+                  onDoubleClick={() => onRowDoubleClick && onRowDoubleClick(row)}
+                >
                   {columns.map((col, colIndex) => (
                     <td key={colIndex} className={cn("px-6 py-4", col.cellClassName)}>
                       {col.render ? col.render(row, rowIndex) : row[col.key]}
@@ -453,7 +495,7 @@ const Reports = () => {
         )
       },
       { label: "Ofitsiant", key: "waiter_name", cellClassName: "font-medium text-foreground", render: (s) => s.waiter_name || "Kassir" },
-      { label: "Mijoz", key: "customer_id", cellClassName: "text-sm text-muted-foreground", render: (s) => s.customer_id ? "Mijoz mavjud" : "-" },
+      { label: "Mijoz", key: "customer_name", cellClassName: "text-sm text-muted-foreground", render: (s) => s.customer_name || "-" },
       {
         label: "To'lov Turi",
         key: "payment_method",
@@ -502,7 +544,7 @@ const Reports = () => {
       { label: "Summa", key: "total_amount", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-black text-foreground", render: (s) => s.total_amount?.toLocaleString() }
 
     ];
-    return <SortableTable columns={columns} data={salesData} emptyMessage="Hech qanday savdo tarixi yo'q" />;
+    return <SortableTable columns={columns} data={salesData} emptyMessage="Hech qanday savdo tarixi yo'q" onRowDoubleClick={handleSaleClick} />;
   };
 
   const renderCancelledOrders = () => {
@@ -581,9 +623,107 @@ const Reports = () => {
         cellClassName: "text-right font-medium text-red-500",
         render: (s) => (s.total_debt || 0).toLocaleString()
       },
-      { label: "Jami Savdo", key: "total_sales", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-black text-foreground", render: (s) => (s.total_sales || 0).toLocaleString() }
+      { label: "Jami Savdo", key: "total_sales", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-black text-foreground", render: (s) => (s.total_sales || 0).toLocaleString() },
+      {
+        label: "",
+        key: "actions",
+        className: "w-12",
+        render: (s) => (
+          <Button variant="ghost" size="icon" onClick={() => loadShiftDetails(s)}>
+            <Search size={16} className="text-muted-foreground" />
+          </Button>
+        )
+      }
     ];
+
+    // SortableTable likely doesn't support onRowDoubleClick directly from here without checking props, 
+    // so we added an explicit action button for clarity and reliability.
     return <SortableTable columns={columns} data={shiftsData} emptyMessage="Smenalar tarixi topilmadi" />;
+  };
+
+  const renderShiftDetails = () => {
+    // Reuse renderHistory columns/logic but for shiftSales
+    // This is a simplified version of renderHistory tailored for this view
+    if (!selectedShift) return null;
+
+    const columns = [
+      { label: "#Chek", key: "check_number", className: "w-20 font-bold text-muted-foreground", render: (s) => `#${s.check_number || s.id.slice(0, 8)}` },
+      {
+        label: "Vaqt",
+        key: "date",
+        render: (s) => (
+          <div className="flex flex-col">
+            <span className="font-bold text-foreground">{formatTime(s.date)}</span>
+            <span className="text-[10px] text-muted-foreground">{formatDate(s.date)}</span>
+          </div>
+        )
+      },
+      { label: "Ofitsiant", key: "waiter_name", cellClassName: "font-medium text-foreground", render: (s) => s.waiter_name || "Kassir" },
+      { label: "Mijoz", key: "customer_name", cellClassName: "text-sm text-muted-foreground", render: (s) => s.customer_name || "-" },
+      {
+        label: "To'lov Turi",
+        key: "payment_method",
+        render: (s) => {
+          if (s.payment_method === 'split') {
+            try {
+              const parsed = JSON.parse(s.items_json || '{}');
+              const details = parsed.paymentDetails || [];
+
+              return (
+                <div className="flex flex-col gap-1.5 items-start">
+                  {details.map((d, idx) => (
+                    <span
+                      key={idx}
+                      className={cn(
+                        "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border flex items-center gap-1.5",
+                        d.method === 'cash' ? "bg-green-500/10 text-green-700 border-green-500/20 dark:text-green-500" :
+                          d.method === 'card' ? "bg-blue-500/10 text-blue-700 border-blue-500/20 dark:text-blue-500" :
+                            d.method === 'debt' ? "bg-red-500/10 text-red-700 border-red-500/20 dark:text-red-500" :
+                              "bg-secondary text-muted-foreground border-border"
+                      )}
+                    >
+                      <span>{d.method === 'cash' ? 'Naqd' : d.method === 'card' ? 'Karta' : d.method === 'click' ? 'Click' : d.method}:</span>
+                      <span className="font-black opacity-80">{(d.amount || 0).toLocaleString()}</span>
+                    </span>
+                  ))}
+                </div>
+              );
+            } catch (e) {
+              return <span className="bg-secondary px-2 py-1 rounded text-xs">Split</span>;
+            }
+          }
+
+          return (
+            <span className={cn(
+              "px-2.5 py-1 rounded-md text-xs font-bold uppercase border",
+              s.payment_method === 'cash' ? "bg-green-500/10 text-green-600 border-green-500/20" :
+                s.payment_method === 'card' ? "bg-blue-500/10 text-blue-600 border-blue-500/20" :
+                  s.payment_method === 'debt' ? "bg-red-500/10 text-red-600 border-red-500/20" : "bg-secondary text-muted-foreground border-border"
+            )}>
+              {s.payment_method === 'cash' ? 'Naqd' : s.payment_method === 'card' ? 'Karta' : s.payment_method === 'debt' ? 'Nasiya' : s.payment_method}
+            </span>
+          );
+        }
+      },
+      { label: "Summa", key: "total_amount", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-black text-foreground", render: (s) => s.total_amount?.toLocaleString() }
+    ];
+
+    return (
+      <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" onClick={() => setSelectedShift(null)} className="gap-2">
+            <ChevronLeft size={16} /> Ortga
+          </Button>
+          <div>
+            <h3 className="text-lg font-bold">Smena Tafsilotlari</h3>
+            <p className="text-sm text-muted-foreground">
+              Kassir: {selectedShift.cashier_name} | {formatDateTime(selectedShift.start_time)}
+            </p>
+          </div>
+        </div>
+        <SortableTable columns={columns} data={shiftSales} emptyMessage="Bu smenada savdo bo'lmagan" onRowDoubleClick={handleSaleClick} />
+      </div>
+    );
   };
 
   return (
@@ -686,11 +826,19 @@ const Reports = () => {
             {activeTab === 'staff' && renderStaff()}
             {activeTab === 'products' && renderProducts()}
             {activeTab === 'history' && renderHistory()}
-            {activeTab === 'shifts' && renderShifts()}
+            {activeTab === 'shifts' && !selectedShift && renderShifts()}
+            {activeTab === 'shifts' && selectedShift && renderShiftDetails()}
             {activeTab === 'trash' && renderCancelledOrders()}
           </div>
         </div>
       </div>
+
+      <SaleDetailModal
+        isOpen={isSaleModalOpen}
+        onClose={() => setIsSaleModalOpen(false)}
+        sale={selectedSale}
+        checkNumber={selectedSale?.check_number || selectedSale?.id?.slice(0, 8)}
+      />
     </div>
   );
 };
