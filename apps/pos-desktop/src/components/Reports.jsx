@@ -54,6 +54,7 @@ const Reports = () => {
   const [selectedSale, setSelectedSale] = useState(null);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [shiftViewMode, setShiftViewMode] = useState('orders');
 
   const [dateRange, setDateRange] = useState({
     startDate: getTodayDate(),
@@ -69,9 +70,18 @@ const Reports = () => {
     setLoading(true);
     try {
       const { ipcRenderer } = window.electron;
+
+      // Convert local date string (YYYY-MM-DD) to Date object at start of day
+      const start = new Date(dateRange.startDate);
+      start.setHours(0, 0, 0, 0);
+
+      // Convert local date string to Date object at end of day
+      const end = new Date(dateRange.endDate);
+      end.setHours(23, 59, 59, 999);
+
       const range = {
-        startDate: `${dateRange.startDate}T00:00:00.000Z`,
-        endDate: `${dateRange.endDate}T23:59:59.999Z`
+        startDate: start.toISOString(),
+        endDate: end.toISOString()
       };
 
       const [sData, cData, tData, shifts] = await Promise.all([
@@ -195,6 +205,29 @@ const Reports = () => {
       hourlySales: hourlyMap
     };
   }, [salesData]);
+
+  const shiftProducts = useMemo(() => {
+    if (!shiftSales || shiftSales.length === 0) return [];
+    let productMap = {};
+    shiftSales.forEach(sale => {
+      try {
+        let items = [];
+        const parsed = JSON.parse(sale.items_json || '[]');
+        if (parsed.items && Array.isArray(parsed.items)) {
+          items = parsed.items;
+        } else if (Array.isArray(parsed)) {
+          items = parsed;
+        }
+        items.forEach(item => {
+          const pName = item.product_name || item.name;
+          if (!productMap[pName]) productMap[pName] = { name: pName, qty: 0, revenue: 0 };
+          productMap[pName].qty += (item.quantity || item.qty);
+          productMap[pName].revenue += (item.price * (item.quantity || item.qty));
+        });
+      } catch (e) { }
+    });
+    return Object.values(productMap).sort((a, b) => b.qty - a.qty);
+  }, [shiftSales]);
 
   // --- RENDERERS ---
 
@@ -494,6 +527,7 @@ const Reports = () => {
           </div>
         )
       },
+      { label: "Stol", key: "table_name", cellClassName: "text-sm text-foreground font-medium", render: (s) => s.table_name || "-" },
       { label: "Ofitsiant", key: "waiter_name", cellClassName: "font-medium text-foreground", render: (s) => s.waiter_name || "Kassir" },
       { label: "Mijoz", key: "customer_name", cellClassName: "text-sm text-muted-foreground", render: (s) => s.customer_name || "-" },
       {
@@ -708,20 +742,72 @@ const Reports = () => {
       { label: "Summa", key: "total_amount", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-black text-foreground", render: (s) => s.total_amount?.toLocaleString() }
     ];
 
+    const handlePrintShiftProducts = async () => {
+      if (!window.electron) return;
+      try {
+        await window.electron.ipcRenderer.invoke('print-shift-products', { shift: selectedShift, products: shiftProducts });
+        showToast('success', "Smena mahsulotlari chop etilmoqda...");
+      } catch (error) {
+        console.error(error);
+        showToast('error', "Chop etishda xatolik yuz berdi");
+      }
+    };
+
+    const productColumns = [
+      {
+        label: "Mahsulot Nomi",
+        key: "name",
+        render: (p, i) => (
+          <div className="font-bold text-foreground flex items-center gap-3">
+            <span className="text-muted-foreground/50 w-6 text-sm font-mono">#{i + 1}</span>
+            {p.name}
+          </div>
+        )
+      },
+      { label: "Sotilgan Soni", key: "qty", className: "text-center", headerAlign: "justify-center", cellClassName: "text-center font-bold text-muted-foreground" },
+      { label: "Jami Summa", key: "revenue", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-black text-primary", render: (p) => p.revenue.toLocaleString() }
+    ];
+
     return (
       <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" onClick={() => setSelectedShift(null)} className="gap-2">
-            <ChevronLeft size={16} /> Ortga
-          </Button>
-          <div>
-            <h3 className="text-lg font-bold">Smena Tafsilotlari</h3>
-            <p className="text-sm text-muted-foreground">
-              Kassir: {selectedShift.cashier_name} | {formatDateTime(selectedShift.start_time)}
-            </p>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" onClick={() => setSelectedShift(null)} className="gap-2">
+              <ChevronLeft size={16} /> Ortga
+            </Button>
+            <div>
+              <h3 className="text-lg font-bold">Smena Tafsilotlari</h3>
+              <p className="text-sm text-muted-foreground">
+                Kassir: {selectedShift.cashier_name} | {formatDateTime(selectedShift.start_time)}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <div className="flex bg-secondary p-1 rounded-lg border border-border">
+              <button
+                onClick={() => setShiftViewMode('orders')}
+                className={cn("px-4 py-1.5 rounded-md text-sm font-bold transition-all", shiftViewMode === 'orders' ? "bg-card shadow text-primary" : "text-muted-foreground hover:text-foreground")}
+              >Cheklar</button>
+              <button
+                onClick={() => setShiftViewMode('products')}
+                className={cn("px-4 py-1.5 rounded-md text-sm font-bold transition-all", shiftViewMode === 'products' ? "bg-card shadow text-primary" : "text-muted-foreground hover:text-foreground")}
+              >Mahsulotlar</button>
+            </div>
+
+            {shiftViewMode === 'products' && (
+              <Button onClick={handlePrintShiftProducts} variant="default" className="gap-2 shadow-lg shadow-primary/20">
+                <Printer size={16} /> Chop etish
+              </Button>
+            )}
           </div>
         </div>
-        <SortableTable columns={columns} data={shiftSales} emptyMessage="Bu smenada savdo bo'lmagan" onRowDoubleClick={handleSaleClick} />
+
+        {shiftViewMode === 'orders' ? (
+          <SortableTable columns={columns} data={shiftSales} emptyMessage="Bu smenada savdo bo'lmagan" onRowDoubleClick={handleSaleClick} />
+        ) : (
+          <SortableTable columns={productColumns} data={shiftProducts} emptyMessage="Smenada mahsulotlar sotilmagan" />
+        )}
       </div>
     );
   };
@@ -809,12 +895,22 @@ const Reports = () => {
 
           <div className="flex gap-8 bg-secondary/10 p-2 rounded-2xl border border-border">
             <div className="text-right px-4">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Jami Tushum</p>
-              <p className="text-2xl font-black text-primary">{stats.totalRevenue.toLocaleString()}</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                {selectedShift ? "Smena Tushumi" : "Jami Tushum"}
+              </p>
+              <p className="text-2xl font-black text-primary">
+                {selectedShift
+                  ? (selectedShift.total_sales || 0).toLocaleString()
+                  : stats.totalRevenue.toLocaleString()}
+              </p>
             </div>
             <div className="text-right border-l border-border pl-8 pr-4">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Cheklar</p>
-              <p className="text-2xl font-black text-foreground">{stats.totalOrders}</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                {selectedShift ? "Smena Cheklari" : "Cheklar"}
+              </p>
+              <p className="text-2xl font-black text-foreground">
+                {selectedShift ? shiftSales.length : stats.totalOrders}
+              </p>
             </div>
           </div>
         </div>

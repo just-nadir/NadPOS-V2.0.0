@@ -30,14 +30,18 @@ module.exports = {
     // Smenani yopish (Z-Report)
     closeShift: async ({ endCash, endCard }) => {
         try {
+            log.info("Closing shift... Params:", { endCash, endCard });
+
             const activeShift = db.prepare("SELECT * FROM shifts WHERE status = 'open'").get();
             if (!activeShift) {
+                log.warn("Close Shift: No active shift found");
                 throw new Error("Ochiq smena topilmadi!");
             }
 
             // Faol stollar borligini tekshirish
             const activeTables = db.prepare("SELECT COUNT(*) as count FROM tables WHERE status != 'free'").get();
             if (activeTables.count > 0) {
+                log.warn("Close Shift: Active tables exist");
                 throw new Error("Diqqat! Barcha stollar yopilmagan. Smenani yopishdan oldin iltimos, faol stollarni hisob-kitob qiling.");
             }
 
@@ -66,7 +70,6 @@ module.exports = {
                             else if (d.method === 'click' || d.method === 'transfer') totalTransfer += amount;
                         });
                     } catch (e) {
-                        // Fallback logic could go here, but usually split has details
                     }
                 } else if (sale.payment_method === 'cash') {
                     totalCash += sale.total_amount;
@@ -78,22 +81,20 @@ module.exports = {
             });
 
             // TAFOVUTLARNI HISOBLASH
-            // Naqd pul: (Boshlang'ich + Savdo Naqd) vs (Haqiqiy Kassadagi)
             const expectedCash = (activeShift.start_cash || 0) + totalCash;
             const diffCash = (endCash || 0) - expectedCash;
-
-            // Terminal: (Savdo Karta) vs (Haqiqiy Terminal)
-            // Transfer tizimda avtomatik to'g'ri deb olinadi
             const expectedCard = totalCard;
             const diffCard = (endCard || 0) - expectedCard;
 
-            // Smenani yopish
+            log.info("Shift Calc:", { totalSales, totalCash, totalCard, expectedCash, diffCash });
+
+            // Smenani yopish - Update DB (Direct execution, no transaction for now to be safe)
             db.prepare(`
                 UPDATE shifts 
                 SET end_time = ?, 
                     end_cash = ?, 
-                    declared_cash = ?, -- Kassadagi haqiqiy pul
-                    declared_card = ?, -- Terminaldagi summa
+                    declared_cash = ?, 
+                    declared_card = ?, 
                     difference_cash = ?, 
                     difference_card = ?,
                     status = 'closed', 
@@ -101,7 +102,7 @@ module.exports = {
                 WHERE id = ?
             `).run(
                 endTime,
-                endCash || 0, // Bu end_cash eski logika bo'yicha "qaytarilayotgan summa" bo'lishi mumkin, lekin bu yerda declared sifatida ishlatamiz
+                endCash || 0,
                 endCash || 0,
                 endCard || 0,
                 diffCash,
@@ -109,44 +110,39 @@ module.exports = {
                 totalSales, totalCash, totalCard, totalTransfer, shiftId
             );
 
-            log.info(`Smena yopildi: ID ${shiftId}`);
+            log.info(`Smena yopildi (DB Updated): ID ${shiftId}`);
 
-            // Telegramga hisobot yuborish (Removed)
-            /*
-            try {
-                await telegramController.sendShiftReport(shiftId);
-            } catch (tgErr) {
-                log.warn("Telegram Z-Report xatosi:", tgErr.message);
-            }
-            */
-
-            // Printerga chiqarish (Z-Report)
-            try {
-                const printerService = require('../services/printerService.cjs');
-                await printerService.printZReport({
-                    shiftId: shiftId,
-                    startTime: activeShift.start_time,
-                    endTime: endTime,
-                    cashierName: activeShift.cashier_name,
-
-                    systemCash: totalCash,
-                    startCash: activeShift.start_cash || 0,
-                    expectedCash: expectedCash,
-                    actualCash: endCash || 0,
-                    diffCash: diffCash,
-
-                    systemCard: totalCard,
-                    actualCard: endCard || 0,
-                    diffCard: diffCard,
-
-                    systemTransfer: totalTransfer,
-                    totalSales: totalSales
-                });
-            } catch (printErr) {
-                log.warn("Printer Z-Report xatosi:", printErr.message);
-            }
-
+            // Notify UI IMMEDIATELY before printer
             notify('shift-status', 'closed');
+
+            // Printerga chiqarish (Z-Report) - Fire and Forget
+            // DO NOT AWAIT PRINTER TO AVOID BLOCKING UI RESPONSE
+            setTimeout(async () => {
+                try {
+                    log.info("Printing Z-Report...");
+                    const printerService = require('../services/printerService.cjs');
+                    await printerService.printZReport({
+                        shiftId: shiftId,
+                        startTime: activeShift.start_time,
+                        endTime: endTime,
+                        cashierName: activeShift.cashier_name,
+                        systemCash: totalCash,
+                        startCash: activeShift.start_cash || 0,
+                        expectedCash: expectedCash,
+                        actualCash: endCash || 0,
+                        diffCash: diffCash,
+                        systemCard: totalCard,
+                        actualCard: endCard || 0,
+                        diffCard: diffCard,
+                        systemTransfer: totalTransfer,
+                        totalSales: totalSales
+                    });
+                    log.info("Z-Report Printed Successfully");
+                } catch (printErr) {
+                    log.error("Printer Z-Report xatosi (Ignored):", printErr.message);
+                }
+            }, 100);
+
             return { success: true };
         } catch (err) {
             log.error("closeShift xatosi:", err);
@@ -169,8 +165,7 @@ module.exports = {
 
             const query = `
                 SELECT * FROM shifts 
-                WHERE datetime(start_time, 'localtime') >= datetime(?) 
-                  AND datetime(start_time, 'localtime') <= datetime(?)
+                WHERE start_time >= ? AND start_time <= ?
                 ORDER BY start_time DESC
             `;
             const shifts = db.prepare(query).all(startDate, endDate);

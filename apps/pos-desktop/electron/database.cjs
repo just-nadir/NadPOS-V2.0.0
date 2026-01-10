@@ -173,6 +173,10 @@ function createV2Tables() {
         server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`).run();
 
+    try {
+        db.prepare("ALTER TABLE sales ADD COLUMN table_name TEXT").run();
+    } catch (e) { /* Column likely exists */ }
+
     db.prepare(`CREATE TABLE IF NOT EXISTS sale_items(
         id TEXT PRIMARY KEY,
         sale_id TEXT,

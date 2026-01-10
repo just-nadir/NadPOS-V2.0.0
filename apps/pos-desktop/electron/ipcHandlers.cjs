@@ -123,6 +123,7 @@ function registerIpcHandlers(ipcMain) {
     ipcMain.handle('get-sales-trend', (e, { startDate, endDate } = {}) => orderController.getSalesTrend(startDate, endDate)); // YANGI (Dynamic)
     ipcMain.handle('get-cancelled-orders', (e, { startDate, endDate }) => orderController.getCancelledOrders(startDate, endDate));
     ipcMain.handle('get-sale-details', (e, saleId) => orderController.getSaleDetails(saleId));
+    ipcMain.handle('reprint-receipt', (e, sale) => orderController.reprintReceipt(sale));
 
     // ==========================================
     // 5. CUSTOMERS & DEBTORS (Mijozlar va Qarzdorlar)
@@ -159,6 +160,9 @@ function registerIpcHandlers(ipcMain) {
     ipcMain.handle('shift-close', (e, endCash) => shiftController.closeShift(endCash));
     ipcMain.handle('shift-status', () => shiftController.getShiftStatus());
     ipcMain.handle('get-shifts', (e, { startDate, endDate }) => shiftController.getShifts(startDate, endDate));
+    ipcMain.handle('print-shift-products', async (e, { shift, products }) => {
+        return await printerService.printShiftProducts(shift, products);
+    });
 }
 
 module.exports = registerIpcHandlers;

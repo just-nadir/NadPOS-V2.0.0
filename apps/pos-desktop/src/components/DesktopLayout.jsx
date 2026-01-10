@@ -40,6 +40,9 @@ const DesktopLayout = () => {
     if (data.type === 'printer-error') {
       showToast('error', `Printer Xatosi: ${data.id}`);
     }
+    if (data.type === 'shift-status') {
+      checkShift();
+    }
   });
 
   useIpcListener('sync-status', (event, data) => {

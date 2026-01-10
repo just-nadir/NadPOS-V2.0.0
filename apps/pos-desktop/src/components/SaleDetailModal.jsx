@@ -13,10 +13,15 @@ import {
     TableHeader,
     TableRow,
 } from './ui/table';
+import { Button } from './ui/button';
+import { Printer } from 'lucide-react';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/currencyUtils';
+import { useGlobal } from '../context/GlobalContext';
 
 const SaleDetailModal = ({ isOpen, onClose, sale, checkNumber }) => {
+    const { showToast } = useGlobal();
+
     if (!sale) return null;
 
     let items = [];
@@ -27,9 +32,7 @@ const SaleDetailModal = ({ isOpen, onClose, sale, checkNumber }) => {
         } else if (typeof sale.items === 'string') {
             items = JSON.parse(sale.items);
             if (!Array.isArray(items)) {
-                // Handle case where items is an object (e.g. split payment { items: [], paymentDetails: [] })
                 if (items && Array.isArray(items.items)) {
-                    // Extract payment details if available
                     if (Array.isArray(items.paymentDetails)) {
                         paymentDetails = items.paymentDetails;
                     }
@@ -39,21 +42,31 @@ const SaleDetailModal = ({ isOpen, onClose, sale, checkNumber }) => {
                 }
             }
         } else if (typeof sale.items === 'object' && sale.items !== null) {
-            // Handle case where items is already parsed object
             if (Array.isArray(sale.items.items)) {
                 items = sale.items.items;
                 if (Array.isArray(sale.items.paymentDetails)) {
                     paymentDetails = sale.items.paymentDetails;
                 }
             } else {
-                items = []; // Or handle as direct object map if needed, but usually it's items array
+                items = [];
             }
         }
     } catch (e) {
         console.error("Error parsing sale items:", e);
         items = [];
     }
-    const total = sale.amount || 0; // Or calculate from items
+    const total = sale.amount || sale.total_amount || 0;
+
+    const handleReprint = async () => {
+        if (!window.electron) return;
+        try {
+            showToast('success', "Chek chop etilmoqda...");
+            await window.electron.ipcRenderer.invoke('reprint-receipt', sale);
+        } catch (error) {
+            console.error("Reprint error:", error);
+            showToast('error', "Chop etishda xatolik");
+        }
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -97,7 +110,11 @@ const SaleDetailModal = ({ isOpen, onClose, sale, checkNumber }) => {
                     </Table>
                 </div>
 
-                <div className="flex justify-end mt-6 pt-4 border-t border-border">
+                <div className="flex justify-between items-end mt-6 pt-4 border-t border-border">
+                    <Button variant="outline" onClick={handleReprint} className="gap-2">
+                        <Printer size={16} /> Chop etish
+                    </Button>
+
                     <div className="flex flex-col items-end gap-1">
                         <span className="text-muted-foreground text-sm">Umumiy summa</span>
                         <span className="text-2xl font-bold text-primary">

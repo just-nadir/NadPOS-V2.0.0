@@ -189,6 +189,7 @@ module.exports = {
                 <div class="header-title uppercase">${restaurantName}</div>
                 ${address ? `<div class="header-info">${address}</div>` : ''}
                 ${phone ? `<div class="header-info">Tel: ${phone}</div>` : ''}
+                ${orderData.isReprint ? '<div class="header-title" style="margin-top: 5px; font-size: 16px;">*** NUSXA ***</div>' : ''}
             </div>
             
             <div class="double-line"></div>
@@ -198,7 +199,7 @@ module.exports = {
                 <div class="text-right">${formatDateTime()}</div>
             </div>
             <div class="flex" style="margin-top: 2px;">
-                <div class="text-left">Stol: <span class="bold">${orderData.tableName}</span></div>
+                <div class="text-left">Stol: <span class="bold uppercase">${orderData.tableName || '-'}</span></div>
                 <div class="text-right">Ofitsiant: <span class="bold uppercase">${waiterName}</span></div>
             </div>
 
@@ -575,6 +576,78 @@ module.exports = {
             <div class="flex total-row">
                 <span>JAMI SAVDO:</span>
                 <span>${shiftReport.totalSales?.toLocaleString()} so'm</span>
+            </div>
+
+            <div class="text-center footer-msg">
+                ${formatDateTime()}
+            </div>
+        `;
+
+        const fullHtml = createHtmlTemplate(content);
+        await printHtml(fullHtml, printerName);
+    },
+
+    // 6. Smena Mahsulotlari (YANGI)
+    printShiftProducts: async (shift, products) => {
+        const settings = getSettings();
+        const printerName = settings.printerReceiptIP;
+        const restaurantName = settings.restaurantName || "RESTORAN";
+
+        // Filter products with 0 quantity if any (optional but good practice)
+        const validProducts = products.filter(p => p.qty > 0);
+
+        const itemsHtml = validProducts.map((item) => `
+            <tr>
+                <td class="col-name">${item.name}</td>
+                <td class="col-qty">${item.qty}</td>
+                <td class="col-total">${item.revenue.toLocaleString()}</td>
+            </tr>
+        `).join('');
+
+        const totalQty = validProducts.reduce((sum, p) => sum + p.qty, 0);
+        const totalRevenue = validProducts.reduce((sum, p) => sum + p.revenue, 0);
+
+        const content = `
+            <div class="text-center">
+                <div class="header-title uppercase">${restaurantName}</div>
+                <div class="header-info">SMENA MAHSULOTLARI</div>
+            </div>
+            
+            <div class="double-line"></div>
+            
+             <div class="flex">
+                <span>Kassir:</span>
+                <span class="bold">${shift.cashier_name}</span>
+            </div>
+            <div class="flex">
+                <span>Boshlandi:</span>
+                <span>${formatDateTime(shift.start_time)}</span>
+            </div>
+            <div class="flex">
+                <span>Tugadi:</span>
+                <span>${shift.end_time ? formatDateTime(shift.end_time) : 'Ochiq'}</span>
+            </div>
+
+            <div class="line"></div>
+
+            <table>
+                <tr>
+                    <td class="col-name bold">Nomi</td>
+                    <td class="col-qty bold">Soni</td>
+                    <td class="col-total bold">Summa</td>
+                </tr>
+                ${itemsHtml}
+            </table>
+
+            <div class="line"></div>
+
+            <div class="flex bold">
+                <span>JAMI SONI:</span>
+                <span>${totalQty}</span>
+            </div>
+            <div class="flex total-row">
+                <span>JAMI SUMMA:</span>
+                <span>${totalRevenue.toLocaleString()}</span>
             </div>
 
             <div class="text-center footer-msg">

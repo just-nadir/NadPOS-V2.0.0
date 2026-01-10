@@ -269,6 +269,9 @@ module.exports = {
                 waiterName = table ? table.waiter_name : "Kassir";
                 guestCount = table ? table.guests : 0;
 
+                // Prepare table name for DB
+                const tableNameForDb = table ? `${table.hall_name} ${table.table_name}` : "Noma'lum";
+
                 // Prepare items_json with payment details if split payment
                 let itemsJson;
                 if (paymentMethod === 'split' && paymentDetails) {
@@ -282,7 +285,7 @@ module.exports = {
                 }
 
                 const saleId = crypto.randomUUID();
-                db.prepare(`INSERT INTO sales (id, date, total_amount, subtotal, discount, payment_method, customer_id, items_json, check_number, waiter_name, guest_count, shift_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(saleId, date, total, subtotal, discount, paymentMethod, customerId, itemsJson, checkNumber, waiterName, guestCount, activeShift.id);
+                db.prepare(`INSERT INTO sales (id, date, total_amount, subtotal, discount, payment_method, customer_id, items_json, check_number, waiter_name, guest_count, shift_id, table_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(saleId, date, total, subtotal, discount, paymentMethod, customerId, itemsJson, checkNumber, waiterName, guestCount, activeShift.id, tableNameForDb);
 
                 // --- YANGI: SKLAD (Stock) ni kamaytirish ---
                 items.forEach(item => {
@@ -397,8 +400,7 @@ module.exports = {
 
             const query = `
             SELECT * FROM sales 
-            WHERE datetime(date, 'localtime') >= datetime(?) 
-              AND datetime(date, 'localtime') <= datetime(?)
+            WHERE date >= ? AND date <= ?
             ORDER BY date DESC
         `;
 
@@ -459,8 +461,7 @@ module.exports = {
             }
             const query = `
             SELECT * FROM cancelled_orders 
-            WHERE datetime(date, 'localtime') >= datetime(?) 
-              AND datetime(date, 'localtime') <= datetime(?)
+            WHERE date >= ? AND date <= ?
             ORDER BY date DESC
             `;
             return db.prepare(query).all(startDate, endDate);
@@ -482,8 +483,7 @@ module.exports = {
                         strftime('%Y-%m-%d', date) as day, 
                         SUM(total_amount) as total 
                     FROM sales 
-                    WHERE datetime(date, 'localtime') >= datetime(?) 
-                      AND datetime(date, 'localtime') <= datetime(?)
+                    WHERE date >= ? AND date <= ?
                     GROUP BY strftime('%Y-%m-%d', date) 
                     ORDER BY day ASC
                 `;
@@ -720,6 +720,77 @@ module.exports = {
             };
         } catch (err) {
             log.error("getSaleDetails xatosi:", err);
+            throw err;
+        }
+    },
+
+    reprintReceipt: async (sale) => {
+        try {
+            // Reconstruct necessary data for printing
+            // sale object comes from frontend, usually from getSales
+
+            let items = [];
+            let paymentDetails = [];
+            let parsedItems = sale.items;
+
+            if (typeof parsedItems === 'string') {
+                try {
+                    const parsed = JSON.parse(parsedItems);
+                    if (Array.isArray(parsed)) {
+                        items = parsed;
+                    } else if (parsed && Array.isArray(parsed.items)) {
+                        // Split payment structure
+                        items = parsed.items;
+                        paymentDetails = parsed.paymentDetails;
+                    }
+                } catch (e) {
+                    items = [];
+                }
+            } else if (Array.isArray(parsedItems)) {
+                items = parsedItems;
+            } else if (parsedItems && typeof parsedItems === 'object') {
+                if (Array.isArray(parsedItems.items)) {
+                    items = parsedItems.items;
+                    paymentDetails = parsedItems.paymentDetails;
+                }
+            }
+
+            // Fetch table info if needed, but for history we might not have it or it's just a text
+            // We can check if we have table_name or can infer it. 
+            // Usually sales history doesn't store table name explicitly unless it was part of snapshot.
+            // But we can just use "Chek qayta chop etildi" or similar header.
+
+            const settingsRows = db.prepare('SELECT * FROM settings').all();
+            const settings = settingsRows.reduce((acc, row) => {
+                acc[row.key] = row.value;
+                return acc;
+            }, {});
+
+            const subtotal = sale.subtotal || sale.total_amount; // fallback
+            const total = sale.total_amount;
+            const discount = sale.discount || 0;
+            const service = total - (subtotal - discount);
+
+            // Re-print
+            // Note: printOrderReceipt might need 'tableName'
+
+            await printerService.printOrderReceipt({
+                checkNumber: sale.check_number,
+                tableName: sale.table_name || '-', // Use actual table name if available
+                waiterName: sale.waiter_name || 'Kassir',
+                items: items,
+                subtotal: subtotal,
+                total: total,
+                discount: discount,
+                service: service,
+                paymentMethod: sale.payment_method,
+                paymentDetails: paymentDetails,
+                isReprint: true // This will now show "*** NUSHXA ***" in header
+            });
+
+            return { success: true };
+        } catch (err) {
+            log.error("Reprint receipt error:", err);
             throw err;
         }
     }
