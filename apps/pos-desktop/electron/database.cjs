@@ -81,6 +81,7 @@ function createV2Tables() {
         is_active INTEGER DEFAULT 1,
         unit_type TEXT DEFAULT 'item', -- 'item' | 'kg'
         stock REAL DEFAULT 0, -- YANGI: Qoldiq
+        track_stock INTEGER DEFAULT 1, -- YANGI: Ombor hisobi (1=Ha, 0=Yo'q)
         server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP, deleted_at TEXT,
         FOREIGN KEY(category_id) REFERENCES categories(id)
     )`).run();
@@ -92,6 +93,10 @@ function createV2Tables() {
 
     try {
         db.prepare("ALTER TABLE products ADD COLUMN stock REAL DEFAULT 0").run();
+    } catch (e) { /* Column likely exists */ }
+
+    try {
+        db.prepare("ALTER TABLE products ADD COLUMN track_stock INTEGER DEFAULT 1").run();
     } catch (e) { /* Column likely exists */ }
 
     // 2.1 Stock History (Ombor Tarixi)

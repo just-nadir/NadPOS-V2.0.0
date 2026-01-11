@@ -41,7 +41,9 @@ module.exports = {
 
     addProduct: (p) => {
         const id = crypto.randomUUID();
-        const res = db.prepare('INSERT INTO products (id, category_id, name, price, destination, unit_type, is_active, is_synced) VALUES (?, ?, ?, ?, ?, ?, ?, 0)').run(id, p.category_id, p.name, p.price, String(p.destination), p.unit_type || 'item', 1);
+        const res = db.prepare('INSERT INTO products (id, category_id, name, price, destination, unit_type, track_stock, is_active, is_synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)').run(
+            id, p.category_id, p.name, p.price, String(p.destination), p.unit_type || 'item', (p.track_stock !== undefined ? p.track_stock : 1), 1
+        );
         notify('products', null);
         return res;
     },
@@ -49,9 +51,9 @@ module.exports = {
     updateProduct: (p) => {
         const res = db.prepare(`
             UPDATE products 
-            SET category_id = ?, name = ?, price = ?, destination = ?, unit_type = ?, is_synced = 0, updated_at = CURRENT_TIMESTAMP
+            SET category_id = ?, name = ?, price = ?, destination = ?, unit_type = ?, track_stock = ?, is_synced = 0, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).run(p.category_id, p.name, p.price, String(p.destination), p.unit_type || 'item', p.id);
+        `).run(p.category_id, p.name, p.price, String(p.destination), p.unit_type || 'item', (p.track_stock !== undefined ? p.track_stock : 1), p.id);
         notify('products', null);
         return res;
     },

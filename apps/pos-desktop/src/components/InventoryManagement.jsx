@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import ConfirmModal from './ConfirmModal';
 
 // --- MODAL: Yangi Kirim (Touch Optimized) ---
 const CreateSupplyModal = ({ isOpen, onClose, onCreate }) => {
@@ -61,6 +62,7 @@ const SupplyEditor = ({ supplyId, onClose, refreshHelper }) => {
     const [qty, setQty] = useState('');
     const [price, setPrice] = useState('');
     const [searchProd, setSearchProd] = useState('');
+    const [confirmState, setConfirmState] = useState({ isOpen: false, message: '', onConfirm: null });
 
     const loadDetails = async () => {
         setLoading(true);
@@ -107,8 +109,15 @@ const SupplyEditor = ({ supplyId, onClose, refreshHelper }) => {
         } catch (err) { console.error(err); }
     };
 
-    const handleComplete = async () => {
-        if (!confirm("Diqqat! Hujjat tasdiqlangandan so'ng mahsulotlar omborga tushadi. Davom etasizmi?")) return;
+    const handleCompleteClick = () => {
+        setConfirmState({
+            isOpen: true,
+            message: "Diqqat! Hujjat tasdiqlangandan so'ng mahsulotlar omborga tushadi. Davom etasizmi?",
+            onConfirm: performComplete
+        });
+    };
+
+    const performComplete = async () => {
         try {
             const { ipcRenderer } = window.electron;
             await ipcRenderer.invoke('complete-supply', supplyId);
@@ -120,7 +129,7 @@ const SupplyEditor = ({ supplyId, onClose, refreshHelper }) => {
     if (loading) return <div className="p-20 text-center text-xl text-muted-foreground animate-pulse">Yuklanmoqda...</div>;
     if (!supply) return <div className="p-20 text-center text-xl text-destructive">Hujjat topilmadi</div>;
 
-    const filteredProds = products.filter(p => p.name.toLowerCase().includes(searchProd.toLowerCase()));
+    const filteredProds = products.filter(p => p.name.toLowerCase().includes(searchProd.toLowerCase()) && p.track_stock !== 0);
     const isDraft = supply.status === 'draft';
 
     return (
@@ -143,7 +152,7 @@ const SupplyEditor = ({ supplyId, onClose, refreshHelper }) => {
                         <p className="text-4xl font-black text-primary tabular-nums tracking-tight">{supply.total_amount?.toLocaleString() || 0} so'm</p>
                     </div>
                     {isDraft && (
-                        <Button onClick={handleComplete} className="gap-3 h-14 px-8 text-xl font-bold bg-green-600 hover:bg-green-700 text-white shadow-xl hover:shadow-2xl hover:scale-105 transition-all">
+                        <Button onClick={handleCompleteClick} className="gap-3 h-14 px-8 text-xl font-bold bg-green-600 hover:bg-green-700 text-white shadow-xl hover:shadow-2xl hover:scale-105 transition-all">
                             <Save size={24} /> Tasdiqlash
                         </Button>
                     )}
@@ -226,10 +235,7 @@ const SupplyEditor = ({ supplyId, onClose, refreshHelper }) => {
                                     <label className="block text-sm font-bold text-muted-foreground mb-2 uppercase tracking-wide">Miqdor</label>
                                     <Input required type="number" step="0.001" value={qty} onChange={e => setQty(e.target.value)} placeholder="0" className="h-16 text-2xl font-bold text-center rounded-xl bg-background" />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-muted-foreground mb-2 uppercase tracking-wide">Kirish Narxi (dona/kg)</label>
-                                    <Input required type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" className="h-16 text-2xl font-bold text-center rounded-xl bg-background" />
-                                </div>
+
 
                                 <Button disabled={!selectedProduct} type="submit" className="w-full h-16 text-xl font-bold rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all" size="lg">
                                     Qo'shish
@@ -239,6 +245,13 @@ const SupplyEditor = ({ supplyId, onClose, refreshHelper }) => {
                     </Card>
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={confirmState.isOpen}
+                onClose={() => setConfirmState({ ...confirmState, isOpen: false })}
+                onConfirm={confirmState.onConfirm}
+                message={confirmState.message}
+            />
         </div>
     );
 };
@@ -250,6 +263,7 @@ const InventoryManagement = () => {
     const [products, setProducts] = useState([]);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editingSupplyId, setEditingSupplyId] = useState(null);
+    const [confirmState, setConfirmState] = useState({ isOpen: false, message: '', onConfirm: null });
 
     const loadData = async () => {
         if (!window.electron) return;
@@ -277,15 +291,22 @@ const InventoryManagement = () => {
         } catch (err) { console.error(err); }
     };
 
-    const deleteDraft = async (id, e) => {
+    const handleDeleteDraftClick = (id, e) => {
         e.stopPropagation();
-        if (!confirm("Hujjatni o'chirmoqchimisiz?")) return;
+        setConfirmState({
+            isOpen: true,
+            message: "Hujjatni o'chirmoqchimisiz?",
+            onConfirm: () => performDeleteDraft(id)
+        });
+    }
+
+    const performDeleteDraft = async (id) => {
         try {
             const { ipcRenderer } = window.electron;
             await ipcRenderer.invoke('delete-supply', id);
             loadData();
         } catch (err) { console.error(err); }
-    }
+    };
 
     return (
         <div className="flex flex-col h-full w-full bg-background relative">
@@ -327,7 +348,6 @@ const InventoryManagement = () => {
                                             <th className="px-8 py-6 font-bold text-muted-foreground text-sm uppercase tracking-wider">Sana</th>
                                             <th className="px-8 py-6 font-bold text-muted-foreground text-sm uppercase tracking-wider">Yetkazib Beruvchi</th>
                                             <th className="px-8 py-6 font-bold text-muted-foreground text-sm uppercase tracking-wider">Status</th>
-                                            <th className="px-8 py-6 font-bold text-muted-foreground text-sm uppercase tracking-wider">Summa</th>
                                             <th className="px-8 py-6 text-right font-bold text-muted-foreground text-sm uppercase tracking-wider">Amallar</th>
                                         </tr>
                                     </thead>
@@ -349,10 +369,10 @@ const InventoryManagement = () => {
                                                         : <Badge variant="secondary" className="gap-2 px-4 py-1.5 text-sm font-bold bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-500/10 dark:text-green-400 border border-green-200 dark:border-green-900/50"><CheckCircle size={16} /> Tasdiqlangan</Badge>
                                                     }
                                                 </td>
-                                                <td className="px-8 py-6 font-black text-xl text-primary tabular-nums tracking-tight">{s.total_amount?.toLocaleString()} so'm</td>
+
                                                 <td className="px-8 py-6 text-right">
                                                     {s.status === 'draft' && (
-                                                        <Button size="icon" variant="ghost" onClick={(e) => deleteDraft(s.id, e)} className="h-12 w-12 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all">
+                                                        <Button size="icon" variant="ghost" onClick={(e) => handleDeleteDraftClick(s.id, e)} className="h-12 w-12 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all">
                                                             <Trash2 size={24} />
                                                         </Button>
                                                     )}
@@ -384,7 +404,7 @@ const InventoryManagement = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
-                                    {products.map(p => (
+                                    {products.filter(p => p.track_stock !== 0).map(p => (
                                         <tr key={p.id} className="hover:bg-secondary/20 transition-colors">
                                             <td className="px-8 py-6 font-bold text-xl text-foreground">{p.name}</td>
                                             <td className="px-8 py-6 text-lg text-muted-foreground font-medium">{p.category_name || '-'}</td>
@@ -393,7 +413,7 @@ const InventoryManagement = () => {
                                                     "font-bold text-lg px-4 py-1.5 rounded-lg",
                                                     p.stock > 5 ? "bg-secondary text-foreground" : "bg-destructive/10 text-destructive border-destructive/20"
                                                 )}>
-                                                    {p.stock} {p.unit_type}
+                                                    {p.stock} {p.unit_type === 'item' ? '' : p.unit_type}
                                                 </Badge>
                                             </td>
                                             <td className="px-8 py-6 text-xl font-bold text-foreground tabular-nums">{p.price.toLocaleString()} so'm</td>
@@ -408,6 +428,13 @@ const InventoryManagement = () => {
 
             <CreateSupplyModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onCreate={handleCreateSupply} />
             {editingSupplyId && <SupplyEditor supplyId={editingSupplyId} onClose={() => { setEditingSupplyId(null); loadData(); }} refreshHelper={loadData} />}
+
+            <ConfirmModal
+                isOpen={confirmState.isOpen}
+                onClose={() => setConfirmState({ ...confirmState, isOpen: false })}
+                onConfirm={confirmState.onConfirm}
+                message={confirmState.message}
+            />
         </div>
     );
 };

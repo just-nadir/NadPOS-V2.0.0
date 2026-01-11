@@ -80,8 +80,8 @@ const TablesGrid = ({ onSelectTable, selectedTableId }) => { // Accepted selecte
   };
 
   const handleTableDoubleClick = (table) => {
-    // Agar stol bo'sh bo'lsa yoki band bo'lsa (qo'shimcha buyurtma uchun)
-    if (table.status === 'free' || table.status === 'occupied') {
+    // Agar stol bo'sh, band yoki to'lov holatida bo'lsa (qo'shimcha buyurtma uchun)
+    if (table.status === 'free' || table.status === 'occupied' || table.status === 'payment') {
       const hall = halls.find(h => h.id === table.hall_id);
       const displayName = hall ? `${hall.name} ${table.name}` : table.name;
       setMenuModal({ isOpen: true, table: { ...table, name: displayName } });

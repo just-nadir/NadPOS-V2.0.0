@@ -146,6 +146,7 @@ module.exports = {
         const address = settings.address || "";
         const phone = settings.phone || "";
         const footerText = settings.receiptFooter || "Xaridingiz uchun rahmat!";
+        const adText = settings.ad_text || "";
         const checkNum = orderData.checkNumber || 0;
         const waiterName = orderData.waiterName || "Kassir";
 
@@ -203,8 +204,6 @@ module.exports = {
                 <div class="text-right">Ofitsiant: <span class="bold uppercase">${waiterName}</span></div>
             </div>
 
-            <div class="line"></div>
-
             <table>
                 <tr>
                     <td class="col-name bold">Nomi</td>
@@ -215,15 +214,13 @@ module.exports = {
                 ${itemsHtml}
             </table>
 
-            <div class="line"></div>
-
             <div class="flex">
                 <span>Jami:</span>
                 <span>${(orderData.subtotal || 0).toLocaleString()}</span>
             </div>
             
             <div class="flex">
-                <span>Xizmat:</span>
+                <span>Xizmat haqi ${settings.serviceChargeValue || 0}%:</span>
                 <span>${(orderData.service || 0).toLocaleString()}</span>
             </div>
 
@@ -235,18 +232,18 @@ module.exports = {
 
             <div class="double-line"></div>
 
-            <div class="flex" style="align-items: center; margin-top: 5px;">
-                <div style="width: 40%; text-align: left;">
-                    ${qrCodeHtml}
-                </div>
-                <div style="width: 60%; text-align: right;">
-                    <div class="total-row" style="margin-top: 0;">
-                        <span>JAMI: ${orderData.total.toLocaleString()}</span>
-                    </div>
-                    <div class="footer-msg" style="margin-top: 5px;">
-                        ${footerText}
-                    </div>
-                </div>
+            <div class="text-right" style="margin-top: 5px; margin-bottom: 10px;">
+                 <span class="total-row" style="font-size: 18px;">JAMI: ${orderData.total.toLocaleString()}</span>
+            </div>
+
+            ${adText ? `<div class="text-center bold" style="margin-bottom: 5px; font-size: 14px;">${adText}</div>` : ''}
+
+            <div class="text-center footer-msg" style="margin-bottom: 10px;">
+                ${footerText}
+            </div>
+
+            <div class="text-center">
+                ${qrCodeHtml}
             </div>
         `;
 
@@ -262,6 +259,7 @@ module.exports = {
         const restaurantName = settings.restaurantName || "RESTORAN";
         const address = settings.address || "";
         const phone = settings.phone || "";
+        const adText = settings.ad_text || "";
         const checkNum = billData.checkNumber || 0;
         const waiterName = billData.waiterName || "Ofitsiant";
 
@@ -318,8 +316,6 @@ module.exports = {
                 <div class="text-right">Ofitsiant: <span class="bold uppercase">${waiterName}</span></div>
             </div>
 
-            <div class="line"></div>
-
             <table>
                 <tr>
                     <td class="col-name bold">Nomi</td>
@@ -330,33 +326,31 @@ module.exports = {
                 ${itemsHtml}
             </table>
 
-            <div class="line"></div>
-
             <div class="flex">
                 <span>Jami:</span>
                 <span>${(billData.subtotal || 0).toLocaleString()}</span>
             </div>
             
             <div class="flex">
-                <span>Xizmat:</span>
+                <span>Xizmat haqi ${settings.serviceChargeValue || 0}%:</span>
                 <span>${(billData.service || 0).toLocaleString()}</span>
             </div>
 
             <div class="double-line"></div>
 
-            <div class="flex" style="align-items: center; margin-top: 5px;">
-                <div style="width: 40%; text-align: left;">
-                    ${qrCodeHtml}
-                </div>
-                <div style="width: 60%; text-align: right;">
-                    <div class="total-row" style="margin-top: 0;">
-                        <span>JAMI: ${billData.total.toLocaleString()}</span>
-                    </div>
-                    <div class="footer-msg" style="margin-top: 5px;">
-                        <div>Yoqimli ishtaxa!</div>
-                        <div style="font-size: 11px; margin-top: 2px;">(To'lov qilinmadi)</div>
-                    </div>
-                </div>
+            <div class="text-right" style="margin-top: 5px; margin-bottom: 10px;">
+                <span class="total-row" style="font-size: 18px;">JAMI: ${billData.total.toLocaleString()}</span>
+            </div>
+
+            ${adText ? `<div class="text-center bold" style="margin-bottom: 5px; font-size: 14px;">${adText}</div>` : ''}
+
+            <div class="text-center footer-msg" style="margin-bottom: 10px;">
+                <div>Yoqimli ishtaxa!</div>
+                <div style="font-size: 11px; margin-top: 2px;">(To'lov qilinmadi)</div>
+            </div>
+
+            <div class="text-center">
+                ${qrCodeHtml}
             </div>
         `;
 

@@ -25,6 +25,7 @@ const Settings = () => {
     printerReceiptIP: "",
     eskiz_email: "", eskiz_password: "", eskiz_nickname: "4546",
     qr_link: "",
+    ad_text: "",
   });
 
   useEffect(() => {
@@ -215,6 +216,11 @@ const Settings = () => {
                     <input type="text" name="qr_link" value={settings.qr_link || ''} onChange={handleChange} placeholder="https://instagram.com/nadpos" className="w-full h-14 pl-12 pr-4 bg-secondary/20 rounded-xl border border-border outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-bold text-lg text-foreground transition-all" />
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground italic">Chekning pastki qismida chiqadigan QR kod uchun havola.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-muted-foreground mb-2 uppercase tracking-wide">Reklama Matni</label>
+                  <textarea rows="2" name="ad_text" value={settings.ad_text || ''} onChange={handleChange} placeholder="Masalan: Bizda yetkazib berish xizmati mavjud" className="w-full p-4 bg-secondary/20 rounded-xl border border-border outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 text-lg font-medium text-foreground resize-none transition-all"></textarea>
+                  <p className="mt-2 text-xs text-muted-foreground italic">Bu matn chekda "Yoqimli ishtaha" yozuvidan oldin chiqadi.</p>
                 </div>
               </div>
             </div>

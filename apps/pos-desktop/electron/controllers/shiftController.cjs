@@ -121,6 +121,8 @@ module.exports = {
                 try {
                     log.info("Printing Z-Report...");
                     const printerService = require('../services/printerService.cjs');
+
+                    // 1. Print Financial Z-Report
                     await printerService.printZReport({
                         shiftId: shiftId,
                         startTime: activeShift.start_time,
@@ -138,8 +140,39 @@ module.exports = {
                         totalSales: totalSales
                     });
                     log.info("Z-Report Printed Successfully");
+
+                    // 2. Print Product Sales Report (YANGI)
+                    const shiftProducts = db.prepare(`
+                        SELECT 
+                            si.product_name as name, 
+                            SUM(si.quantity) as qty, 
+                            SUM(si.total_price) as revenue
+                        FROM sale_items si
+                        JOIN sales s ON s.id = si.sale_id
+                        WHERE s.shift_id = ?
+                        GROUP BY si.product_name
+                        HAVING qty > 0
+                        ORDER BY revenue DESC
+                    `).all(shiftId);
+
+                    if (shiftProducts && shiftProducts.length > 0) {
+                        log.info(`Printing Shift Products Report... (${shiftProducts.length} items)`);
+
+                        // Shift object for header info
+                        const shiftData = {
+                            cashier_name: activeShift.cashier_name,
+                            start_time: activeShift.start_time,
+                            end_time: endTime
+                        };
+
+                        await printerService.printShiftProducts(shiftData, shiftProducts);
+                        log.info("Shift Products Report Printed Successfully");
+                    } else {
+                        log.info("No products sold in this shift, skipping product report.");
+                    }
+
                 } catch (printErr) {
-                    log.error("Printer Z-Report xatosi (Ignored):", printErr.message);
+                    log.error("Printer Report Error (Ignored):", printErr.message);
                 }
             }, 100);
 

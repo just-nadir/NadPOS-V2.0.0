@@ -60,6 +60,21 @@ const ProductModal = ({ isOpen, onClose, onSubmit, newProduct, setNewProduct, ca
             </div>
           </div>
 
+          {/* TRACK STOCK (OMBOR) */}
+          <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-xl border border-border">
+            <input
+              type="checkbox"
+              id="track_stock"
+              checked={newProduct.track_stock !== 0}
+              onChange={e => setNewProduct({ ...newProduct, track_stock: e.target.checked ? 1 : 0 })}
+              className="w-5 h-5 accent-primary cursor-pointer"
+            />
+            <label htmlFor="track_stock" className="flex-1 cursor-pointer">
+              <span className="block text-sm font-bold text-foreground">Ombor hisobi yuritilsinmi?</span>
+              <span className="block text-xs text-muted-foreground">Agar o'chirilgan bo'lsa, qoldiq hisoblanmaydi (Xizmatlar uchun)</span>
+            </label>
+          </div>
+
           <button type="submit" className="w-full py-4 bg-primary text-primary-foreground font-bold rounded-xl shadow-lg hover:bg-primary/90 mt-6 text-lg">Saqlash</button>
         </form>
       </div>
@@ -76,7 +91,7 @@ const MenuManagement = () => {
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newProduct, setNewProduct] = useState({ name: '', price: '', category_id: '', destination: '1', unit_type: 'item' });
+  const [newProduct, setNewProduct] = useState({ name: '', price: '', category_id: '', destination: '1', unit_type: 'item', track_stock: 1 });
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -173,7 +188,7 @@ const MenuManagement = () => {
 
       setIsModalOpen(false);
       // Reset qilish
-      setNewProduct({ name: '', price: '', category_id: '', destination: '1', unit_type: 'item' });
+      setNewProduct({ name: '', price: '', category_id: '', destination: '1', unit_type: 'item', track_stock: 1 });
       loadData();
     } catch (err) { console.error(err); }
   };
@@ -357,8 +372,12 @@ const MenuManagement = () => {
 
                   {/* Stock (Qoldiq) */}
                   <div className="col-span-2">
-                    <div className={cn("font-bold text-lg flex items-center gap-1.5", product.stock <= 5 ? "text-destructive" : "text-foreground")}>
-                      {product.stock || 0} <span className="text-sm text-muted-foreground font-medium">{product.unit_type === 'kg' ? 'kg' : 'dona'}</span>
+                    <div className={cn("font-bold text-lg flex items-center gap-1.5", product.stock <= 5 && product.track_stock !== 0 ? "text-destructive" : "text-foreground")}>
+                      {product.track_stock === 0 ? (
+                        <span className="text-muted-foreground font-normal">-</span>
+                      ) : (
+                        <>{product.stock || 0} <span className="text-sm text-muted-foreground font-medium">{product.unit_type === 'kg' ? 'kg' : 'dona'}</span></>
+                      )}
                     </div>
                   </div>
 

@@ -287,19 +287,25 @@ module.exports = {
                 const saleId = crypto.randomUUID();
                 db.prepare(`INSERT INTO sales (id, date, total_amount, subtotal, discount, payment_method, customer_id, items_json, check_number, waiter_name, guest_count, shift_id, table_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(saleId, date, total, subtotal, discount, paymentMethod, customerId, itemsJson, checkNumber, waiterName, guestCount, activeShift.id, tableNameForDb);
 
-                // --- YANGI: SKLAD (Stock) ni kamaytirish ---
+                // --- YANGI: SKLAD (Stock) ni kamaytirish va SALE_ITEMS ga yozish ---
                 items.forEach(item => {
-                    // Qoldiqni kamaytirish: Avval ID orqali, topilmasa nomi orqali (Backward compatibility)
+                    // 1. Qoldiqni kamaytirish
                     let product = null;
                     if (item.product_id) {
-                        product = db.prepare('SELECT id, stock FROM products WHERE id = ?').get(item.product_id);
+                        product = db.prepare('SELECT id, stock, category_id, track_stock FROM products WHERE id = ?').get(item.product_id);
                     }
                     if (!product) {
-                        product = db.prepare('SELECT id, stock FROM products WHERE name = ?').get(item.product_name);
+                        product = db.prepare('SELECT id, stock, category_id, track_stock FROM products WHERE name = ?').get(item.product_name || item.name);
                     }
 
-                    if (product) {
-                        const qtyNum = Number(item.quantity);
+                    const qtyNum = Number(item.quantity);
+                    const prodName = item.product_name || item.name;
+                    const price = Number(item.price);
+
+                    // Agar product topilsa va track_stock (Ombor) yoqilgan bo'lsa (yoki undefined bo'lsa default true deb olamiz)
+                    const shouldTrack = product && (product.track_stock === 1 || product.track_stock === undefined || product.track_stock === null);
+
+                    if (shouldTrack) {
                         const currentStock = Number(product.stock || 0);
                         const newStock = currentStock - qtyNum;
 
@@ -312,6 +318,19 @@ module.exports = {
                             crypto.randomUUID(), product.id, qtyNum, newStock, 'sale', `Savdo #${checkNumber}`, date, waiterName, null, require('../database.cjs').RESTAURANT_ID
                         );
                     }
+
+                    // 2. SALE_ITEMS ga yozish (Shift report uchun muhim)
+                    let categoryName = 'Boshqa';
+                    if (product && product.category_id) {
+                        const cat = db.prepare('SELECT name FROM categories WHERE id = ?').get(product.category_id);
+                        if (cat) categoryName = cat.name;
+                    }
+
+                    db.prepare(`INSERT INTO sale_items (
+                        id, sale_id, product_name, category_name, price, quantity, total_price, date, restaurant_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+                        crypto.randomUUID(), saleId, prodName, categoryName, price, qtyNum, price * qtyNum, date, require('../database.cjs').RESTAURANT_ID
+                    );
                 });
                 // -------------------------------------------
 
