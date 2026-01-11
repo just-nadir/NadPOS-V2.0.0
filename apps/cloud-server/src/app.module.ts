@@ -11,6 +11,8 @@ import { RestaurantModule } from './restaurant/restaurant.module';
 import { Restaurant } from './restaurant/entities/restaurant.entity';
 import { Supply } from './restaurant/entities/supply.entity';
 import { SupplyItem } from './restaurant/entities/supply-item.entity';
+import { ReservationsModule } from './reservations/reservations.module';
+import { Reservation } from './reservations/entities/reservation.entity';
 
 @Module({
   imports: [
@@ -27,13 +29,14 @@ import { SupplyItem } from './restaurant/entities/supply-item.entity';
         username: config.get<string>('DB_USERNAME'),
         password: config.get<string>('DB_PASSWORD'),
         database: config.get<string>('DB_DATABASE'),
-        entities: [Restaurant, Supply, SupplyItem],
+        entities: [Restaurant, Supply, SupplyItem, Reservation],
         synchronize: config.get<string>('NODE_ENV') !== 'production', // Only true in dev
         logging: false,
       }),
       inject: [ConfigService],
     }),
     RestaurantModule,
+    ReservationsModule,
   ],
   controllers: [AppController, SyncController],
   providers: [AppService, SyncService, SyncGateway],

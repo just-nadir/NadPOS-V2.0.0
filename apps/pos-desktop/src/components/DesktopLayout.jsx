@@ -19,6 +19,7 @@ const CustomersManagement = lazy(() => import('./CustomersManagement'));
 const Reports = lazy(() => import('./Reports'));
 const Settings = lazy(() => import('./Settings'));
 const InventoryManagement = lazy(() => import('./InventoryManagement'));
+const ReservationsManagement = lazy(() => import('./ReservationsManagement'));
 
 // Yuklanayotganda ko'rsatiladigan chiroyli spinner
 const PageLoader = () => (
@@ -125,6 +126,7 @@ const DesktopLayout = () => {
             case 'reports': return <Reports />;
             case 'settings': return <Settings />;
             case 'inventory': return <InventoryManagement />;
+            case 'reservations': return <ReservationsManagement />;
             default: return <div>Sahifa topilmadi</div>;
           }
         })()}

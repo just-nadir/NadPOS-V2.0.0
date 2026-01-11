@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, UtensilsCrossed, Settings, LogOut, Square, Users, FileText, PieChart, MessageSquare, Lock, Search, Cloud, CloudOff, RefreshCw, Package, Moon, Sun, Monitor } from 'lucide-react';
+import { LayoutGrid, UtensilsCrossed, Settings, LogOut, Square, Users, FileText, PieChart, MessageSquare, Lock, Search, Cloud, CloudOff, RefreshCw, Package, Moon, Sun, Monitor, Calendar } from 'lucide-react';
 import { APP_INFO } from '../config/appConfig';
 import { cn } from '../utils/cn';
 import { Button } from './ui/button';
@@ -29,6 +29,7 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user, onCloseShift, syncSta
     { id: 'menu', icon: <UtensilsCrossed />, label: "Menyu" },
     { id: 'tables', icon: <Square />, label: "Zallar" },
     { id: 'customers', icon: <Users />, label: "Mijozlar" },
+    { id: 'reservations', icon: <Calendar />, label: "Bronlar" },
     { id: 'reports', icon: <PieChart />, label: "Xisobot" },
     { id: 'inventory', icon: <Package />, label: "Ombor" },
     { id: 'settings', icon: <Settings />, label: "Sozlama" },

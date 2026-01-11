@@ -14,6 +14,7 @@ const inventoryController = require('./controllers/inventoryController.cjs'); //
 
 const printerService = require('./services/printerService.cjs');
 // const licenseController = require('./controllers/licenseController.cjs'); // License System (REMOVED)
+const reservationsController = require('./controllers/reservationsController.cjs');
 
 
 
@@ -163,6 +164,14 @@ function registerIpcHandlers(ipcMain) {
     ipcMain.handle('print-shift-products', async (e, { shift, products }) => {
         return await printerService.printShiftProducts(shift, products);
     });
+
+    // ==========================================
+    // 11. RESERVATIONS (Bronlar) - YANGI
+    // ==========================================
+    ipcMain.handle('get-reservations', () => reservationsController.getReservations());
+    ipcMain.handle('create-reservation', (e, data) => reservationsController.createReservation(data));
+    ipcMain.handle('update-reservation-status', (e, { id, status }) => reservationsController.updateReservationStatus(id, status));
+    ipcMain.handle('delete-reservation', (e, id) => reservationsController.deleteReservation(id));
 }
 
 module.exports = registerIpcHandlers;
