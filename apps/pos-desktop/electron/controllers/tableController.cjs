@@ -21,7 +21,12 @@ module.exports = {
     return res;
   },
 
-  getTables: () => db.prepare('SELECT * FROM tables WHERE deleted_at IS NULL').all(),
+  getTables: () => db.prepare(`
+    SELECT t.*, h.name as hall_name 
+    FROM tables t 
+    LEFT JOIN halls h ON t.hall_id = h.id 
+    WHERE t.deleted_at IS NULL
+  `).all(),
 
   getTablesByHall: (id) => db.prepare('SELECT * FROM tables WHERE hall_id = ? AND deleted_at IS NULL').all(id),
 
