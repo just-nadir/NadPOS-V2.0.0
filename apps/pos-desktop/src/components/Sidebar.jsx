@@ -15,15 +15,6 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user, onCloseShift, syncSta
     }
   }, []);
 
-  const getSyncIcon = () => {
-    const { status } = syncStatus || {};
-    if (status === 'syncing') return <RefreshCw className="animate-spin text-blue-500" size={24} />;
-    if (status === 'connecting') return <Cloud className="animate-pulse text-yellow-500" size={24} />;
-    if (status === 'online') return <Cloud className="text-green-500" size={24} />;
-    if (status === 'error') return <CloudOff className="text-red-500" size={24} />;
-    return <CloudOff className="text-muted-foreground" size={24} />;
-  };
-
   const menuItems = [
     { id: 'pos', icon: <LayoutGrid />, label: "Kassa" },
     { id: 'menu', icon: <UtensilsCrossed />, label: "Menyu" },
@@ -97,10 +88,6 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user, onCloseShift, syncSta
         )}
 
         <div className="flex flex-col items-center gap-3 mb-2">
-          {/* Sync Indicator */}
-          <div className="p-2 rounded-full bg-secondary flex items-center justify-center" title={`Sync: ${syncStatus?.status || 'Offline'} - ${syncStatus?.lastSync || ''}`}>
-            {getSyncIcon()}
-          </div>
 
           <button onClick={onLogout} className="p-3 text-destructive hover:bg-destructive/10 rounded-xl transition-all" title="Chiqish">
             <LogOut size={24} />
