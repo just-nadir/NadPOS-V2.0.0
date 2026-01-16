@@ -43,6 +43,23 @@ const PinLogin = () => {
     }
   };
 
+  // Versiyani olish
+  const [appVersion, setAppVersion] = useState(APP_INFO.version);
+
+  React.useEffect(() => {
+    const fetchVersion = async () => {
+      if (window.api && window.api.getAppVersion) { // Preload da 'api' deb nomlangan
+        try {
+          const v = await window.api.getAppVersion();
+          setAppVersion("v" + v);
+        } catch (e) {
+          console.error("Versiyani olishda xato:", e);
+        }
+      }
+    };
+    fetchVersion();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md">
@@ -78,7 +95,7 @@ const PinLogin = () => {
 
         <div className="mt-8 text-center text-gray-400 text-xs font-medium">
           <p className="mb-1">Powered by {APP_INFO.creator}</p>
-          <p>{APP_INFO.name} {APP_INFO.version} © {APP_INFO.since}</p>
+          <p>{APP_INFO.name} {appVersion} © {APP_INFO.since}</p>
         </div>
       </div>
     </div>
