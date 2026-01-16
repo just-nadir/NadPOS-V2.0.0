@@ -92,13 +92,12 @@ const DesktopLayout = () => {
   const renderContent = () => {
     // XAVFSIZLIK: Kassir cheklovi
     if (user.role === 'cashier') {
-      const allowed = ['pos', 'customers'];
-      if (!allowed.includes(activePage)) {
+      if (activePage === 'inventory') {
         return (
           <div className="flex flex-col items-center justify-center h-full text-gray-400">
             <ShieldAlert size={64} className="mb-4 text-orange-400" />
             <h2 className="text-2xl font-bold text-gray-700">Ruxsat yo'q</h2>
-            <p>Siz faqat Kassa va Mijozlar bo'limiga kira olasiz.</p>
+            <p>Sizga Ombor bo'limiga kirish uchun ruxsat berilmagan.</p>
           </div>
         );
       }

@@ -199,12 +199,12 @@ function startServer() {
     }
   });
 
-  // Static fayllarni ulash (Dist papkasi)
-  app.use(express.static(path.join(__dirname, '../dist')));
+  // Static fayllarni ulash (Mobil Ilova uchun)
+  app.use(express.static(path.join(__dirname, '../../pos-mobile/dist')));
 
   // Barcha boshqa so'rovlar uchun index.html qaytarish (SPA uchun)
   app.get(/.*/, (req, res) => {
-    res.sendFile(path.join(__dirname, '../dist/index.html'));
+    res.sendFile(path.join(__dirname, '../../pos-mobile/dist/index.html'));
   });
 
 

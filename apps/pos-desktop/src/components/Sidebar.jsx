@@ -17,12 +17,12 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user, onCloseShift, syncSta
 
   const menuItems = [
     { id: 'pos', icon: <LayoutGrid />, label: "Kassa" },
-    { id: 'menu', icon: <UtensilsCrossed />, label: "Menyu" },
-    { id: 'tables', icon: <Square />, label: "Zallar" },
-    { id: 'customers', icon: <Users />, label: "Mijozlar" },
     { id: 'reservations', icon: <Calendar />, label: "Bronlar" },
-    { id: 'reports', icon: <PieChart />, label: "Xisobot" },
+    { id: 'customers', icon: <Users />, label: "Mijozlar" },
+    { id: 'tables', icon: <Square />, label: "Zallar" },
+    { id: 'menu', icon: <UtensilsCrossed />, label: "Menyu" },
     { id: 'inventory', icon: <Package />, label: "Ombor" },
+    { id: 'reports', icon: <PieChart />, label: "Xisobot" },
     { id: 'settings', icon: <Settings />, label: "Sozlama" },
   ];
 
@@ -31,9 +31,9 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user, onCloseShift, syncSta
     // Admin: Hammasi
     if (user?.role === 'admin') return true;
 
-    // Kassir: Faqat Kassa, Mijozlar
+    // Kassir: Ombordan boshqa hammasi
     if (user?.role === 'cashier') {
-      return ['pos', 'customers'].includes(item.id);
+      return item.id !== 'inventory';
     }
 
     return false;

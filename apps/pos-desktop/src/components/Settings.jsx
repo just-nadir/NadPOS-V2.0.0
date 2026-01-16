@@ -1,10 +1,86 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Printer, Database, Store, Receipt, Percent, RefreshCw, ChefHat, Plus, Trash2, Users, Shield, Key, Coins, CheckCircle, PcCase, MessageSquare, Send, FileText, History, Settings as SettingsIcon } from 'lucide-react';
+import { Save, Printer, Database, Store, Receipt, Percent, RefreshCw, ChefHat, Plus, Trash2, Users, Shield, Key, Coins, CheckCircle, PcCase, MessageSquare, Send, FileText, History, Settings as SettingsIcon, Smartphone } from 'lucide-react';
 import QRCode from "react-qr-code";
 import ConfirmModal from './ConfirmModal';
 import UpdateSettings from './settings/UpdateSettings';
 import { formatDate } from '../utils/dateUtils';
 import { cn } from '../utils/cn';
+
+
+const MobileAppSettings = () => {
+  const [networkInfo, setNetworkInfo] = useState({ ip: 'Ishelayapti...', port: 3000 });
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (window.electron) {
+      window.electron.ipcRenderer.invoke('get-network-ip')
+        .then(info => {
+          setNetworkInfo(info);
+        })
+        .catch(err => {
+          console.error("IP Error:", err);
+          setNetworkInfo({ ip: 'localhost', port: 3000 });
+        });
+    }
+  }, []);
+
+  const url = `http://${networkInfo.ip}:${networkInfo.port}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="max-w-3xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-card p-8 rounded-3xl shadow-sm border border-border text-center">
+        <h3 className="text-2xl font-bold text-foreground mb-2 flex items-center justify-center gap-3">
+          <Smartphone size={32} className="text-blue-500" />
+          Mobil Ofitsiant Ilovasi
+        </h3>
+        <p className="text-muted-foreground mb-8 text-lg">Ofitsiantlar ushbu QR kodni skanerlash orqali tizimga ulanishlari mumkin.</p>
+
+        <div className="bg-white p-4 rounded-3xl inline-block shadow-lg border border-gray-100 mb-8">
+          <QRCode value={url} size={256} />
+        </div>
+
+        <div className="max-w-md mx-auto bg-secondary/20 p-6 rounded-2xl border border-border">
+          <label className="block text-sm font-bold text-muted-foreground mb-2 uppercase tracking-wide">Ulanish Manzili</label>
+          <div className="flex items-center gap-3">
+            <code className="flex-1 bg-background h-14 rounded-xl border border-border flex items-center justify-center font-mono text-xl font-bold text-foreground shadow-inner">
+              {url}
+            </code>
+            <button
+              onClick={handleCopy}
+              className={cn(
+                "h-14 w-14 rounded-xl flex items-center justify-center transition-all shadow-md active:scale-95",
+                copied ? "bg-green-500 text-white" : "bg-blue-500 text-white hover:bg-blue-600"
+              )}
+            >
+              {copied ? <CheckCircle size={24} /> : <div className="font-bold">COPY</div>}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
+            <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mb-2">1</div>
+            <p className="text-sm font-medium">Telefonni Wi-Fi ga ulang</p>
+          </div>
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
+            <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mb-2">2</div>
+            <p className="text-sm font-medium">Kamerani ochib QR kodni skanerlang</p>
+          </div>
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
+            <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mb-2">3</div>
+            <p className="text-sm font-medium">PIN kodingizni terib ishni boshlang</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('general'); // Tabs: general, users, printer_settings
@@ -170,6 +246,7 @@ const Settings = () => {
           <button onClick={() => setActiveTab('general')} className={cn("w-full text-left px-6 h-14 rounded-2xl font-bold flex items-center gap-4 transition-all text-lg", activeTab === 'general' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}><Store size={24} /> Umumiy</button>
           <button onClick={() => setActiveTab('users')} className={cn("w-full text-left px-6 h-14 rounded-2xl font-bold flex items-center gap-4 transition-all text-lg", activeTab === 'users' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}><Users size={24} /> Xodimlar</button>
           <button onClick={() => setActiveTab('printer_settings')} className={cn("w-full text-left px-6 h-14 rounded-2xl font-bold flex items-center gap-4 transition-all text-lg", activeTab === 'printer_settings' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}><Printer size={24} /> Printerlar</button>
+          <button onClick={() => setActiveTab('mobile_app')} className={cn("w-full text-left px-6 h-14 rounded-2xl font-bold flex items-center gap-4 transition-all text-lg", activeTab === 'mobile_app' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}><Smartphone size={24} /> Mobile App</button>
           <button onClick={() => setActiveTab('update')} className={cn("w-full text-left px-6 h-14 rounded-2xl font-bold flex items-center gap-4 transition-all text-lg", activeTab === 'update' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}><RefreshCw size={24} /> Yangilash</button>
         </div>
         <div className="mt-auto">
@@ -361,6 +438,12 @@ const Settings = () => {
         )}
 
 
+
+
+        {/* --- MOBILE APP (QR CODE) --- */}
+        {activeTab === 'mobile_app' && (
+          <MobileAppSettings />
+        )}
 
         {/* --- UPDATE SETTINGS --- */}
         {activeTab === 'update' && <UpdateSettings />}

@@ -172,6 +172,12 @@ function registerIpcHandlers(ipcMain) {
     ipcMain.handle('create-reservation', (e, data) => reservationsController.createReservation(data));
     ipcMain.handle('update-reservation-status', (e, { id, status }) => reservationsController.updateReservationStatus(id, status));
     ipcMain.handle('delete-reservation', (e, id) => reservationsController.deleteReservation(id));
+
+    // SYSTEM INFO (QR Code uchun)
+    const ip = require('ip');
+    ipcMain.handle('get-network-ip', () => {
+        return { ip: ip.address(), port: 3000 };
+    });
 }
 
 module.exports = registerIpcHandlers;
