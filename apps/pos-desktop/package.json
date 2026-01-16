@@ -83,7 +83,7 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.mypos.app",
+    "appId": "nadpos.uz",
     "productName": "NadPOS Restoran",
     "directories": {
       "output": "release"
@@ -108,8 +108,13 @@
       "artifactName": "NadPOS-Restoran-Setup-${version}.${ext}"
     },
     "publish": {
-      "provider": "generic",
-      "url": "http://213.142.148.35/updates/"
+      "provider": "github",
+      "owner": "just-nadir",
+      "repo": "NadPOS-V2.0.0"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/just-nadir/NadPOS-V2.0.0.git"
   }
 }
