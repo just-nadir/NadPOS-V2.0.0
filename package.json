@@ -4,7 +4,8 @@
     "workspaces": [
         "apps/pos-mobile",
         "apps/cloud-backend",
-        "apps/admin-panel"
+        "apps/admin-panel",
+        "apps/pos-desktop"
     ],
     "overrides": {
         "react": "18.3.1",

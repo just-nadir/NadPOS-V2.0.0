@@ -5,10 +5,7 @@ const log = require('electron-log');
 const crypto = require('crypto');
 
 // --- Baza manzilini aniqlash ---
-const isDev = app && app.isPackaged !== undefined ? !app.isPackaged : true;
-const dbPath = isDev
-    ? path.join(__dirname, '../pos.db')
-    : path.join(app ? app.getPath('userData') : __dirname, 'pos.db');
+const { dbPath } = require('./config.cjs');
 
 console.log("📂 BAZA MANZILI (V2):", dbPath);
 
@@ -38,7 +35,25 @@ function hashPIN(pin, salt) {
 const uuidv4 = () => crypto.randomUUID();
 
 // --- DATA TYPES & CONSTANTS ---
-const RESTAURANT_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; // Default UUID for v1 migration
+const config = require('./config.cjs');
+
+// RESTAURANT_ID ni aniqlash (Lazy load later inside functions or init)
+// Lekin konstantalar global bo'lgani yaxshi.
+// Biz database init bo'lganda settingdan o'qiymiz.
+// Keling, bu yerni o'zgartiramiz:
+let RESTAURANT_ID = config.DEFAULT_RESTAURANT_ID;
+
+// Initializatsiyadan oldin aniq bo'lmasligi mumkin, shuning uchun
+// funksiya ichida ishlatganda ehtiyot bo'lish kerak.
+// Yoki initDB da o'qib olamiz.
+
+// Hozircha hardcoded ID o'rniga:
+if (!RESTAURANT_ID) {
+    // Agar env da bo'lmasa, hardcoded fallback (migration successful bo'lishi uchun)
+    // Lekin eng to'g'risi - settings jadvalidan o'qish.
+    // Hozircha V1 migratsiyasi uchun default qoldiramiz, lekin keyinroq settingsdan olamiz.
+    RESTAURANT_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+}
 
 // --- V2 SCHEMA DEFINITION (UUID) ---
 function createV2Tables() {
@@ -697,9 +712,32 @@ function initDB() {
         // --- Foreign Keys Enable (After migration) ---
         db.pragma('foreign_keys = ON');
 
+        // --- Optimizatsiya (Startup) ---
+        runOptimize();
+
     } catch (err) {
         log.error("InitDB Error:", err);
         console.error(err);
+    }
+
+    // --- RESTAURANT_ID ni aniqlashtirish ---
+    try {
+        const ridSetting = db.prepare("SELECT value FROM settings WHERE key = 'restaurant_id'").get();
+        if (ridSetting) {
+            RESTAURANT_ID = ridSetting.value;
+            console.log("🏢 RESTAURANT_ID (Settings):", RESTAURANT_ID);
+        } else {
+            // Agar settingda yo'q bo'lsa, joriy qiymatni yozib qo'yamiz (agar u default bo'lsa ham)
+            // Yoki yangi generatsiya qilamiz agar env da ham yo'q bo'lsa.
+            if (config.DEFAULT_RESTAURANT_ID) {
+                RESTAURANT_ID = config.DEFAULT_RESTAURANT_ID;
+            }
+            // Agar hali ham default bo'lsa (hardcoded), uni saqlaymiz
+            db.prepare("INSERT OR IGNORE INTO settings (key, value, is_synced) VALUES ('restaurant_id', ?, 0)").run(RESTAURANT_ID);
+            console.log("🏢 RESTAURANT_ID (Saved):", RESTAURANT_ID);
+        }
+    } catch (e) {
+        console.error("Failed to load RESTAURANT_ID:", e);
     }
 }
 
@@ -744,5 +782,41 @@ function addToSyncQueue(tableName, recordId, operation, payload) {
     }
 }
 
-module.exports = { db, initDB, onChange, notify, hashPIN, uuidv4, RESTAURANT_ID, addToSyncQueue };
+// --- OPTIMIZATSIYA VA TOZALASH ---
+function runOptimize() {
+    try {
+        console.log("🧹 Database Optimizatsiyasi boshlandi...");
+
+        // 1. Pruning (Eski sync loglarni tozalash - 7 kundan oldingi)
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const res = db.prepare("DELETE FROM sync_queue WHERE status = 'synced' AND created_at < ?").run(sevenDaysAgo);
+        console.log(`🗑️ Synced Loglar tozalandi: ${res.changes} ta qator.`);
+
+        // 2. Analyze (Query plannerini yangilash)
+        db.pragma('optimize'); // SQLite auto-optimize
+        // Yoki db.prepare('ANALYZE').run(); // Agar optimize yetarli bo'lmasa
+
+        console.log("✅ Database Optimizatsiyasi yakunlandi.");
+    } catch (e) {
+        log.error("Database Optimize Error:", e);
+    }
+}
+
+// RESTAURANT_ID ni get qiluvchi funksiya (chunki u o'zgaruvchan bo'lishi mumkin)
+function getRestaurantId() {
+    return RESTAURANT_ID;
+}
+
+module.exports = {
+    db,
+    initDB,
+    onChange,
+    notify,
+    hashPIN,
+    uuidv4,
+    getRestaurantId, // Getter orqali
+    RESTAURANT_ID,  // Hozirgi qiymat (require paytida) - ehtiyot bo'lish kerak
+    addToSyncQueue,
+    runOptimize // Export
+};
 
