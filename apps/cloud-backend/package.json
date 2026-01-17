@@ -4,7 +4,6 @@
     "private": true,
     "description": "NadPOS Cloud SaaS Backend",
     "main": "server.js",
-    "type": "module",
     "scripts": {
         "start": "node server.js",
         "dev": "nodemon server.js"

@@ -2,8 +2,9 @@
     "name": "nadpos-monorepo",
     "private": true,
     "workspaces": [
-        "apps/*",
-        "tools/*"
+        "apps/pos-mobile",
+        "apps/cloud-backend",
+        "apps/admin-panel"
     ],
     "overrides": {
         "react": "18.3.1",

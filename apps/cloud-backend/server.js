@@ -3,9 +3,9 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
-import dotenv from 'dotenv';
-import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
+const dotenv = require('dotenv');
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
 
 dotenv.config();
 
@@ -16,19 +16,44 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_for_nadpos_cloud'
 app.use(cors());
 app.use(express.json());
 
-// --- MOCK DATABASE (MVP uchun) ---
+// --- MOCK DATABASE (MVP) ---
 // Keyinchalik PostgreSQL bo'ladi.
-const users = [
-    {
-        id: '1',
-        email: 'admin@test.com',
-        passwordHash: bcrypt.hashSync('123456', 10),
-        restaurant_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-        role: 'admin',
-        plan: 'premium',
-        expires_at: '2026-12-31T23:59:59.999Z'
+// Hozir: users ma'lumotlari `data/{rid}/users.json` da saqlanadi.
+
+// Helper: Find user across all restaurants
+const findUserByEmail = (email) => {
+    const dataDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dataDir)) return null;
+
+    const dirs = fs.readdirSync(dataDir);
+    for (const rid of dirs) {
+        const userFile = path.join(dataDir, rid, 'users.json');
+        if (fs.existsSync(userFile)) {
+            try {
+                const users = JSON.parse(fs.readFileSync(userFile, 'utf8'));
+                const user = users.find(u => u.email === email);
+                if (user) return { ...user, restaurant_id: rid }; // Ensure RID is attached
+            } catch (e) { }
+        }
     }
-];
+
+    // Fallback Mock Admin (for testing)
+    const mockUsers = [
+        {
+            id: '1',
+            email: 'admin@test.com',
+            passwordHash: bcrypt.hashSync('123456', 10), // $2a$10$...
+            password: '123456', // For plain check if hash fails (legacy mock)
+            restaurant_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+            role: 'admin',
+            plan: 'premium',
+            expires_at: '2026-12-31T23:59:59.999Z'
+        }
+    ];
+    return mockUsers.find(u => u.email === email);
+};
+
+const adminController = require('./adminController');
 
 // --- AUTH API ---
 app.post('/api/auth/login', async (req, res) => {
@@ -37,12 +62,22 @@ app.post('/api/auth/login', async (req, res) => {
 
         console.log(`🔐 Login attempt: ${email} (HWID: ${hwid})`);
 
-        const user = users.find(u => u.email === email);
+        console.log(`🔐 Login attempt: ${email} (HWID: ${hwid})`);
+
+        const user = findUserByEmail(email);
         if (!user) {
             return res.status(401).json({ error: 'Foydalanuvchi topilmadi' });
         }
 
-        const validPassword = bcrypt.compareSync(password, user.passwordHash);
+        let validPassword = false;
+        if (user.passwordHash) {
+            validPassword = bcrypt.compareSync(password, user.passwordHash);
+        } else if (user.password) {
+            // Plain text fallback (created by createRestaurant)
+            // In production, createRestaurant should hash password
+            validPassword = (password === user.password);
+        }
+
         if (!validPassword) {
             return res.status(401).json({ error: 'Noto\'g\'ri parol' });
         }
@@ -162,6 +197,24 @@ app.post('/api/sync/push', (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// --- ADMIN ROUTES ---
+app.post('/api/admin/login', adminController.login);
+app.get('/api/admin/restaurants', adminController.getRestaurants);
+app.post('/api/admin/restaurants', adminController.createRestaurant);
+app.put('/api/admin/restaurants/:id/status', adminController.updateStatus);
+app.get('/api/admin/stats', adminController.getStats);
+
+// --- SERVE ADMIN PANEL ---
+const publicPath = path.join(__dirname, 'public');
+if (fs.existsSync(publicPath)) {
+    app.use(express.static(publicPath));
+    app.get('*', (req, res) => {
+        if (!req.path.startsWith('/api')) {
+            res.sendFile(path.join(publicPath, 'index.html'));
+        }
+    });
+}
 
 app.listen(PORT, () => {
     console.log(`☁️ Cloud Backend running on http://localhost:${PORT}`);
