@@ -4,6 +4,9 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Layout from './components/Layout';
 import Restaurants from './pages/Restaurants';
+import Settings from './pages/Settings';
+import Logs from './pages/Logs';
+import Payments from './pages/Payments';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -12,10 +15,13 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+import { Toaster } from 'react-hot-toast';
+
 function App() {
   return (
     <AuthProvider>
       <Router>
+        <Toaster position="top-right" />
         <Routes>
           <Route path="/login" element={<Login />} />
 
@@ -26,7 +32,9 @@ function App() {
           }>
             <Route index element={<Dashboard />} />
             <Route path="restaurants" element={<Restaurants />} />
-            <Route path="settings" element={<div className="p-4">Sozlamalar (Tez orada)</div>} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="logs" element={<Logs />} />
+            <Route path="payments" element={<Payments />} />
           </Route>
         </Routes>
       </Router>

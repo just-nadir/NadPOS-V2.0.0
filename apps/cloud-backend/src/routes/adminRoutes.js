@@ -10,16 +10,20 @@ const { authMiddleware, superAdminMiddleware } = require('../middlewares/authMid
 
 const authController = require('../controllers/authController');
 
-// Compatibility route for Admin Login
-router.post('/login', authController.login);
+// Public
+router.post('/login', adminController.login);
 
-// Protected Routes (Super Admin Only)
-router.use(authMiddleware);
-router.use(superAdminMiddleware);
+// Protected
+router.get('/stats', authMiddleware.verifySuperAdmin, adminController.getStats);
+router.get('/restaurants', authMiddleware.verifySuperAdmin, adminController.getRestaurants);
+router.post('/create-restaurant', authMiddleware.verifySuperAdmin, adminController.createRestaurant);
 
-router.get('/restaurants', adminController.getRestaurants);
-router.post('/create-restaurant', adminController.createRestaurant);
-router.put('/restaurants/:id/status', adminController.updateStatus);
-router.get('/stats', adminController.getStats);
+// New Routes
+router.put('/restaurants/:id', authMiddleware.verifySuperAdmin, adminController.updateRestaurant);
+router.patch('/restaurants/:id/status', authMiddleware.verifySuperAdmin, adminController.updateRestaurantStatus);
+router.post('/restaurants/:id/reset-password', authMiddleware.verifySuperAdmin, adminController.resetRestaurantPassword);
+router.post('/change-password', authMiddleware.verifySuperAdmin, adminController.changeAdminPassword);
+router.get('/logs', authMiddleware.verifySuperAdmin, adminController.getLogs);
+router.get('/payments', authMiddleware.verifySuperAdmin, adminController.getPayments);
 
 module.exports = router;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, Store, LogOut, Settings } from 'lucide-react';
+import { LayoutDashboard, Store, LogOut, Settings, DollarSign, BarChart2 } from 'lucide-react';
 import clsx from 'clsx';
 
 const Layout = () => {
@@ -26,6 +26,8 @@ const Layout = () => {
                 <nav className="flex-1 p-4 space-y-2">
                     <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Dashboard" />
                     <NavItem to="/restaurants" icon={<Store size={20} />} label="Restoranlar" />
+                    <NavItem to="/payments" icon={<DollarSign size={20} />} label="To'lovlar" />
+                    <NavItem to="/logs" icon={<BarChart2 size={20} />} label="Audit Log" />
                     <NavItem to="/settings" icon={<Settings size={20} />} label="Sozlamalar" />
                 </nav>
 

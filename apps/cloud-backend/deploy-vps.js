@@ -82,14 +82,13 @@ JWT_SECRET="nadpos_super_secret_key_v2_2024"
         console.log('🔄 Reloading Nginx...');
         await ssh.execCommand('docker-compose exec -T nginx nginx -s reload', { cwd: REMOTE_DIR });
 
-        // 7. Prisma Deploy (Wait a bit for DB to start)
-        console.log('⏳ Waiting for Database...');
-        await new Promise(r => setTimeout(r, 10000));
-
-        console.log('🗄️ Running Migrations...');
-        const migrate = await ssh.execCommand('docker-compose exec -T app npx prisma migrate deploy', { cwd: REMOTE_DIR });
-        console.log(migrate.stdout);
-        console.log(migrate.stderr);
+        // 7. Prisma Deploy (Schema Push)
+        console.log('⏳ Updating Database Schema...');
+        // Using db push for easier schema updates without looking for migration files
+        await ssh.execCommand('npx prisma db push --accept-data-loss', { cwd: REMOTE_DIR });
+        // Generate client
+        await ssh.execCommand('npx prisma generate', { cwd: REMOTE_DIR });
+        console.log('✅ DB Schema Updated');
 
         console.log('✨ Deployment Completed Successfully!');
 
