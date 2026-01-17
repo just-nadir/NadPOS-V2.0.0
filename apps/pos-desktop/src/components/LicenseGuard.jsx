@@ -4,7 +4,7 @@ import { Loader2, Lock, WifiOff, Server } from 'lucide-react';
 
 // Cloud Backend URL (Development)
 // Production da buni .env fayldan olish kerak
-const API_URL = 'http://213.142.148.35:4000/api';
+const API_URL = 'https://nadpos.uz/api';
 
 const LicenseGuard = ({ children }) => {
     const [status, setStatus] = useState('CHECKING'); // CHECKING | ACTIVE | LOCKED | OFFLINE_LOCKED

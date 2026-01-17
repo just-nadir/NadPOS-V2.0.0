@@ -12,7 +12,7 @@ module.exports = {
         : path.join(app ? app.getPath('userData') : __dirname, 'pos.db'),
 
     // Cloud Config
-    CLOUD_URL: process.env.CLOUD_URL || 'http://213.142.148.35:4000/api',
+    CLOUD_URL: process.env.CLOUD_URL || 'https://nadpos.uz/api',
 
     // Default Restaurant ID (agar .env da bo'lmasa, database dan olinadi yoki yangi generatsiya qilinadi)
     DEFAULT_RESTAURANT_ID: process.env.RESTAURANT_ID || null,

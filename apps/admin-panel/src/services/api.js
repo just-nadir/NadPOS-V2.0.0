@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // VPS URL
-const API_URL = 'http://213.142.148.35:4000/api';
+const API_URL = 'https://nadpos.uz/api';
 
 const api = axios.create({
     baseURL: API_URL,

@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- TENANCY & AUTH ---
+
+model Restaurant {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  phone       String?
+  plan        String   @default("basic") // basic, standard, premium
+  status      String   @default("active") // active, blocked, trial
+  config      Json?    @default("{}")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  
+  users       User[]
+  licenses    License[]
+  
+  // Sync Data
+  halls       Hall[]
+  tables      Table[]
+  categories  Category[]
+  products    Product[]
+  orders      Order[]
+  customers   Customer[]
+  staff       Staff[]
+
+  @@map("restaurants")
+}
+
+model User {
+  id            String      @id @default(uuid())
+  email         String      @unique
+  password      String
+  role          String      @default("admin") // super_admin, admin
+  restaurant_id String?
+  restaurant    Restaurant? @relation(fields: [restaurant_id], references: [id])
+  created_at    DateTime    @default(now())
+
+  @@map("users")
+}
+
+model License {
+  id            String     @id @default(uuid())
+  key           String     @unique
+  restaurant_id String
+  restaurant    Restaurant @relation(fields: [restaurant_id], references: [id])
+  hwid          String?    // Hardware ID locking
+  expires_at    DateTime
+  status        String     @default("active")
+  created_at    DateTime   @default(now())
+
+  @@map("licenses")
+}
+
+// --- SYNC DATA (Mirror of Desktop DB) ---
+// Har bir jadvalda restaurant_id bo'lishi shart!
+
+model Hall {
+  id            String     @id // UUID from desktop
+  restaurant_id String
+  name          String
+  restaurant    Restaurant @relation(fields: [restaurant_id], references: [id], onDelete: Cascade)
+  tables        Table[]
+  
+  @@unique([id, restaurant_id]) // Composite Key (Global collision avoidance)
+  @@map("halls")
+}
+
+model Table {
+  id            String     @id
+  restaurant_id String
+  hall_id       String
+  name          String
+  status        String     @default("active") // active, occupied, reserved
+  x             Int        @default(0)
+  y             Int        @default(0)
+  restaurant    Restaurant @relation(fields: [restaurant_id], references: [id], onDelete: Cascade)
+  hall          Hall       @relation(fields: [hall_id], references: [id], onDelete: Cascade)
+
+  @@map("tables")
+}
+
+model Category {
+  id            String     @id
+  restaurant_id String
+  name          String
+  image         String?
+  restaurant    Restaurant @relation(fields: [restaurant_id], references: [id], onDelete: Cascade)
+  products      Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            String     @id
+  restaurant_id String
+  category_id   String
+  name          String
+  price         Float
+  image         String?
+  stock         Int        @default(0)
+  restaurant    Restaurant @relation(fields: [restaurant_id], references: [id], onDelete: Cascade)
+  category      Category   @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  order_items   OrderItem[]
+
+  @@map("products")
+}
+
+model Order {
+  id            String      @id
+  restaurant_id String
+  table_id      String?
+  waiter_id     String?
+  customer_id   String?
+  status        String      @default("new")
+  total_amount  Float       @default(0)
+  created_at    DateTime    @default(now()) // Desktopdagi sana kelishi kerak (uni alohida maydon qilamiz)
+  synced_at     DateTime    @default(now())
+  
+  restaurant    Restaurant  @relation(fields: [restaurant_id], references: [id], onDelete: Cascade)
+  items         OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id            String     @id
+  restaurant_id String
+  order_id      String
+  product_id    String
+  quantity      Int
+  price         Float
+  total_price   Float
+  
+  order         Order      @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product       Product    @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model Customer {
+  id            String     @id
+  restaurant_id String
+  name          String
+  phone         String?
+  restaurant    Restaurant @relation(fields: [restaurant_id], references: [id], onDelete: Cascade)
+
+  @@map("customers")
+}
+
+model Staff {
+  id            String     @id
+  restaurant_id String
+  name          String
+  pin           String
+  role          String     @default("waiter")
+  restaurant    Restaurant @relation(fields: [restaurant_id], references: [id], onDelete: Cascade)
+
+  @@map("staff")
+}

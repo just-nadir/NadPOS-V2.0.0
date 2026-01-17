@@ -7,33 +7,40 @@ import Menu from './pages/Menu';
 import CartPage from './pages/CartPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
+import { SocketProvider } from './context/SocketContext';
+import { ThemeProvider } from './context/ThemeContext';
+
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <CartProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Tables />
-              </ProtectedRoute>
-            } />
-            <Route path="/menu/:tableId" element={
-              <ProtectedRoute>
-                <Menu />
-              </ProtectedRoute>
-            } />
-            <Route path="/cart/:tableId" element={
-              <ProtectedRoute>
-                <CartPage />
-              </ProtectedRoute>
-            } />
-            {/* Cart page */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </CartProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <SocketProvider>
+          <AuthProvider>
+            <CartProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/" element={
+                  <ProtectedRoute>
+                    <Tables />
+                  </ProtectedRoute>
+                } />
+                <Route path="/menu/:tableId" element={
+                  <ProtectedRoute>
+                    <Menu />
+                  </ProtectedRoute>
+                } />
+                <Route path="/cart/:tableId" element={
+                  <ProtectedRoute>
+                    <CartPage />
+                  </ProtectedRoute>
+                } />
+                {/* Cart page */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </CartProvider>
+          </AuthProvider>
+        </SocketProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }
