@@ -348,6 +348,22 @@ function createV2Tables() {
         db.prepare("ALTER TABLE reservations ADD COLUMN note TEXT").run();
     } catch (e) { /* Column likely exists */ }
 
+    // ==========================================
+    // 12. SYNC QUEUE (Offline-First SaaS)
+    // ==========================================
+    db.prepare(`CREATE TABLE IF NOT EXISTS sync_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        table_name TEXT,
+        record_id TEXT,
+        operation TEXT, -- 'INSERT', 'UPDATE', 'DELETE'
+        payload TEXT, -- JSON data
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'pending', -- 'pending', 'synced', 'failed'
+        retry_count INTEGER DEFAULT 0,
+        error_message TEXT
+    )`).run();
+
+
     // --- Indexes (Updated) ---
     // Indexes need valid syntax. createV2Tables calls run multiple times.
     const tablesList = ['tables', 'products', 'order_items', 'sales', 'sale_items', 'debt_history', 'customer_debts', 'customers', 'reservations'];
@@ -381,6 +397,9 @@ function createV2Tables() {
     // Supplies Indexes
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_supplies_status ON supplies(status)`).run();
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_supply_items_supply ON supply_items(supply_id)`).run();
+
+    // Sync Queue Index
+    db.prepare(`CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status)`).run();
 
     // --- NEW: Sync & Update Performance Indexes (V2.0.1) ---
     const tablesToSync = [
@@ -707,6 +726,23 @@ function seedDefaults() {
 
     // Default Kitchens seeding removed
     // Default SMS Templates seeding removed
+    // Default SMS Templates seeding removed
+    // Default SMS Templates seeding removed
 }
 
-module.exports = { db, initDB, onChange, notify, hashPIN, uuidv4, RESTAURANT_ID };
+// --- SYNC HELPER ---
+function addToSyncQueue(tableName, recordId, operation, payload) {
+    try {
+        const stmt = db.prepare(`
+            INSERT INTO sync_queue (table_name, record_id, operation, payload)
+            VALUES (?, ?, ?, ?)
+        `);
+        stmt.run(tableName, recordId, operation, JSON.stringify(payload));
+        // console.log(`📦 Added to SyncQueue: ${operation} ${tableName} ${recordId}`);
+    } catch (error) {
+        log.error("Failed to add to SyncQueue:", error);
+    }
+}
+
+module.exports = { db, initDB, onChange, notify, hashPIN, uuidv4, RESTAURANT_ID, addToSyncQueue };
+

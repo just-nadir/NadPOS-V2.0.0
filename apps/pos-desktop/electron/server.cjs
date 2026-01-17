@@ -35,6 +35,8 @@ const productController = require('./controllers/productController.cjs');
 const orderController = require('./controllers/orderController.cjs');
 const settingsController = require('./controllers/settingsController.cjs');
 const staffController = require('./controllers/staffController.cjs');
+const licenseService = require('./services/licenseService.cjs');
+const syncService = require('./services/syncService.cjs'); // YANGI
 
 function startServer() {
   const app = express();
@@ -42,6 +44,26 @@ function startServer() {
 
   app.use(cors());
   app.use(express.json());
+
+  // LICENSE MIDDLEWARE
+  app.use((req, res, next) => {
+    // Ba'zi URLlar ochiq bo'lishi kerak (masalan, login serverga ulanish uchun yoki static fayllar)
+    if (req.path.startsWith('/api/system') || req.path === '/api/login') {
+      return next();
+    }
+
+    // Mobil ilova static fayllari
+    if (!req.path.startsWith('/api')) {
+      return next();
+    }
+
+    const license = licenseService.getLicense();
+    if (license.status !== 'ACTIVE' && license.status !== 'GRACE_PERIOD') {
+      console.warn(`⛔ API Access Denied: ${req.path} (License: ${license.status})`);
+      return res.status(402).json({ error: 'License Required', status: license.status });
+    }
+    next();
+  });
 
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {

@@ -15,10 +15,18 @@ const inventoryController = require('./controllers/inventoryController.cjs'); //
 const printerService = require('./services/printerService.cjs');
 // const licenseController = require('./controllers/licenseController.cjs'); // License System (REMOVED)
 const reservationsController = require('./controllers/reservationsController.cjs');
+const licenseService = require('./services/licenseService.cjs'); // YANGI
 
 
 
 function registerIpcHandlers(ipcMain) {
+
+    // ==========================================
+    // 0. LICENSE & ACTIVATION (SaaS)
+    // ==========================================
+    ipcMain.handle('license:get-info', () => licenseService.getLicense());
+    ipcMain.handle('license:save-token', (e, token) => licenseService.saveLicense(token));
+    ipcMain.handle('license:get-hwid', () => licenseService.getHWID());
 
     // ==========================================
     // 1. AUTH (Tizimga kirish)

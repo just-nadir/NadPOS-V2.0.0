@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: nadpos_backend
+    restart: always
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=4000
+      - JWT_SECRET=nadpos_secret_key_2024
+      # - DATABASE_URL=postgres://admin:password@db:5432/nadpos_cloud
+
+  # Postgres Database (Kelajak uchun tayyor)
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: nadpos_db
+  #   restart: always
+  #   environment:
+  #     POSTGRES_USER: admin
+  #     POSTGRES_PASSWORD: password
+  #     POSTGRES_DB: nadpos_cloud
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+# volumes:
+#   pgdata:

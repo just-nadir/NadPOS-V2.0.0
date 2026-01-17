@@ -1,4 +1,4 @@
-const { db, notify } = require('../database.cjs');
+const { db, notify, addToSyncQueue } = require('../database.cjs');
 const log = require('electron-log');
 const crypto = require('crypto');
 
@@ -24,9 +24,11 @@ module.exports = {
         const { salt, hash } = hashPIN(user.pin);
         db.prepare('UPDATE users SET name = ?, pin = ?, role = ?, salt = ? WHERE id = ?')
           .run(user.name, hash, user.role, salt, user.id);
+        addToSyncQueue('users', user.id, 'UPDATE', { name: user.name, role: user.role, pin: hash, salt });
       } else { // Faqat ism yoki rolni o'zgartirish
         db.prepare('UPDATE users SET name = ?, role = ? WHERE id = ?')
           .run(user.name, user.role, user.id);
+        addToSyncQueue('users', user.id, 'UPDATE', { name: user.name, role: user.role });
       }
       log.info(`XODIM: ${user.name} (${user.role}) ma'lumotlari o'zgartirildi.`);
     } else {
@@ -47,6 +49,7 @@ module.exports = {
       const id = crypto.randomUUID();
       db.prepare('INSERT INTO users (id, name, pin, role, salt) VALUES (?, ?, ?, ?, ?)')
         .run(id, user.name, hash, user.role, salt);
+      addToSyncQueue('users', id, 'INSERT', { id, name: user.name, role: user.role, pin: hash, salt });
 
       log.info(`XODIM: Yangi xodim qo'shildi: ${user.name} (${user.role})`);
     }
@@ -61,6 +64,7 @@ module.exports = {
     }
 
     const res = db.prepare("UPDATE users SET deleted_at = ?, is_synced = 0 WHERE id = ?").run(new Date().toISOString(), id);
+    addToSyncQueue('users', id, 'DELETE', { deleted_at: new Date().toISOString() });
     log.warn(`XODIM: Xodim o'chirildi. ID: ${id}, Ism: ${user?.name}`);
     notify('users', null);
     return res;

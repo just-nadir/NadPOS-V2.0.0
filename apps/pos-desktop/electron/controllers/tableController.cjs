@@ -1,4 +1,4 @@
-const { db, notify } = require('../database.cjs');
+const { db, notify, addToSyncQueue } = require('../database.cjs');
 const crypto = require('crypto');
 
 module.exports = {
@@ -7,6 +7,7 @@ module.exports = {
   addHall: (name) => {
     const id = crypto.randomUUID();
     const res = db.prepare('INSERT INTO halls (id, name) VALUES (?, ?)').run(id, name);
+    addToSyncQueue('halls', id, 'INSERT', { id, name });
     notify('halls', null);
     return res;
   },
@@ -14,8 +15,16 @@ module.exports = {
   deleteHall: (id) => {
     // Soft Delete tables
     db.prepare("UPDATE tables SET deleted_at = ?, is_synced = 0 WHERE hall_id = ?").run(new Date().toISOString(), id);
+    addToSyncQueue('tables', id, 'DELETE_ALL_FOR_HALL', { hallId: id }); // Special op needed or loop update? Loop update is safer.
+    // Simplifying: Just let tables update themselves if accessed, but here massive update.
+    // Ideally we fetch tables and queue individual updates.
+    const tables = db.prepare('SELECT id FROM tables WHERE hall_id = ?').all(id);
+    tables.forEach(t => addToSyncQueue('tables', t.id, 'DELETE', { deleted_at: new Date().toISOString() }));
+
     // Soft Delete hall
     const res = db.prepare("UPDATE halls SET deleted_at = ?, is_synced = 0 WHERE id = ?").run(new Date().toISOString(), id);
+    addToSyncQueue('halls', id, 'DELETE', { deleted_at: new Date().toISOString() });
+
     notify('halls', null);
     notify('tables', null);
     return res;
@@ -33,12 +42,14 @@ module.exports = {
   addTable: (hallId, name) => {
     const id = crypto.randomUUID();
     const res = db.prepare('INSERT INTO tables (id, hall_id, name, is_synced) VALUES (?, ?, ?, 0)').run(id, hallId, name);
+    addToSyncQueue('tables', id, 'INSERT', { id, hall_id: hallId, name });
     notify('tables', null);
     return res;
   },
 
   deleteTable: (id) => {
     const res = db.prepare("UPDATE tables SET deleted_at = ?, is_synced = 0 WHERE id = ?").run(new Date().toISOString(), id);
+    addToSyncQueue('tables', id, 'DELETE', { deleted_at: new Date().toISOString() });
     notify('tables', null);
     return res;
   },
@@ -52,14 +63,19 @@ module.exports = {
 
   updateTableStatus: (id, status) => {
     const res = db.prepare('UPDATE tables SET status = ?, is_synced = 0 WHERE id = ?').run(status, id);
+    addToSyncQueue('tables', id, 'UPDATE', { status });
     notify('tables', null);
     return res;
   },
 
   closeTable: (id) => {
-    // Buyurtmalarni o'chirish (Soft delete emas, shunchaki yopish - lekin agar log kerak bo'lsa cancel/archive qilish kerak. Hozircha hard delete qolaveradi, chunki order_items savdoga aylanmaydi yopilganda, sales ga o'tadi)
+    // Buyurtmalarni o'chirish
     db.prepare('DELETE FROM order_items WHERE table_id = ?').run(id);
+    addToSyncQueue('order_items', id, 'DELETE_ALL_FOR_TABLE', { tableId: id });
+
     const res = db.prepare(`UPDATE tables SET status = 'free', guests = 0, start_time = NULL, total_amount = 0, is_synced = 0 WHERE id = ?`).run(id);
+    addToSyncQueue('tables', id, 'UPDATE', { status: 'free', guests: 0, start_time: null, total_amount: 0 });
+
     notify('tables', null);
     notify('table-items', id);
     return res;
