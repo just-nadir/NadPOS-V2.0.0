@@ -14,7 +14,6 @@
     "electron": "wait-on tcp:5173 && electron . --no-sandbox",
     "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"npm run electron\"",
     "install:deps": "electron-builder install-app-deps",
-    "prebuild": "xcopy /E /I /Y ..\\pos-mobile\\dist mobile-dist",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win --x64",
     "dist:dir": "npm run build && electron-builder --win --dir --x64",
@@ -93,7 +92,6 @@
     },
     "files": [
       "dist/**/*",
-      "mobile-dist/**/*",
       "electron/**/*",
       "package.json"
     ],

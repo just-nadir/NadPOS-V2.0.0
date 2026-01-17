@@ -128,12 +128,45 @@ module.exports = {
 
     // 5. Get Statistics
     getStats: (req, res) => {
-        const total = fs.existsSync(DATA_DIR) ? fs.readdirSync(DATA_DIR).length : 0;
-        // Mock stats
+        if (!fs.existsSync(DATA_DIR)) {
+            return res.json({ total_restaurants: 0, active_today: 0, mrr: 0 });
+        }
+
+        const items = fs.readdirSync(DATA_DIR, { withFileTypes: true });
+        let total = 0;
+        let active = 0;
+        let mrr = 0;
+
+        items.forEach(item => {
+            if (item.isDirectory()) {
+                total++;
+                const configPath = path.join(DATA_DIR, item.name, 'config.json');
+                if (fs.existsSync(configPath)) {
+                    try {
+                        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+
+                        // MRR hisoblash
+                        if (config.plan === 'premium') mrr += 300000;
+                        else if (config.plan === 'standard') mrr += 150000;
+                        else if (config.plan === 'basic') mrr += 100000;
+
+                        // Aktivlikni tekshirish (agar last_sync bo'lsa)
+                        if (config.last_sync) {
+                            const lastSync = new Date(config.last_sync);
+                            const today = new Date();
+                            if (lastSync.setHours(0, 0, 0, 0) === today.setHours(0, 0, 0, 0)) {
+                                active++;
+                            }
+                        }
+                    } catch (e) { }
+                }
+            }
+        });
+
         res.json({
             total_restaurants: total,
-            active_today: Math.floor(total * 0.8),
-            mrr: total * 200000 // UZS mock
+            active_today: active,
+            mrr: mrr
         });
     }
 };

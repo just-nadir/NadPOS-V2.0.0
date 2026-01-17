@@ -201,7 +201,7 @@ app.post('/api/sync/push', (req, res) => {
 // --- ADMIN ROUTES ---
 app.post('/api/admin/login', adminController.login);
 app.get('/api/admin/restaurants', adminController.getRestaurants);
-app.post('/api/admin/restaurants', adminController.createRestaurant);
+app.post('/api/admin/create-restaurant', adminController.createRestaurant);
 app.put('/api/admin/restaurants/:id/status', adminController.updateStatus);
 app.get('/api/admin/stats', adminController.getStats);
 
