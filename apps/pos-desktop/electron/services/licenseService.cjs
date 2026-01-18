@@ -6,7 +6,15 @@ const { app } = require('electron');
 const log = require('electron-log');
 const crypto = require('crypto');
 
-const JWT_PUBLIC_KEY = process.env.JWT_PUBLIC_KEY || "super_secret_key_for_nadpos_cloud"; // Aslida Public Key bo'lishi kerak RSA da
+const JWT_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAovb5epqcLu9D5N6iEIUl
+uLTbO7KA5LojAGoViVP7sKd3HVDGBw8dEE63Ch/i/77Pv49TsbNoyUxHU4K3NidK
+HHUYmVaUIL9TUUx363q/7Ak4JQnyPGe3ay+slEA1HxhPTnC8pPG/JhK/pgo1v/Pd
+DfboiuyU8Wjjbe8UmcKWoN/hjTyHF0cGi/JG+rhP2KcBuPPlzr9FwVYkfrAtSAk3
+GgzVAyFz1Fwx2rnKg7EIL7qLHTHH6zmvSuHD7sK0MnYssOvSCMw15B87U4vf0oAp
+alC7qg7yoR7HH3mY0eKcy9f194FRbw4ZFdAfp73LgolBdoohvJQnN2NBY5/dgI21
+3QIDAQAB
+-----END PUBLIC KEY-----`;
 const LICENSE_FILE = path.join(app.getPath('userData'), 'license.key');
 
 class LicenseService {
@@ -37,9 +45,8 @@ class LicenseService {
 
             const token = fs.readFileSync(LICENSE_FILE, 'utf8').trim();
 
-            // 1. Tokenni tekshirish
-            // MVP da simmetrik kalit (secret) ishlatiyapmiz. Real hayotda Public Key bo'ladi.
-            const decoded = jwt.verify(token, JWT_PUBLIC_KEY);
+            // 1. Tokenni tekshirish (RSA Public Key bilan)
+            const decoded = jwt.verify(token, JWT_PUBLIC_KEY, { algorithms: ['RS256'] });
 
             // 2. HWID tekshirish
             const currentHWID = this.getHWID();

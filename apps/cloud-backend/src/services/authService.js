@@ -24,16 +24,21 @@ const login = async (email, password, hwid) => {
         throw new Error('Restaurant is blocked or inactive');
     }
 
-    // 4. Update Token
-    const payload = {
-        uid: user.id,
-        rid: user.restaurant_id,
-        role: user.role,
-        plan: user.restaurant?.plan || 'basic',
-        hwid: hwid
-    };
+    // 4. Update Token (Sign with RSA Private Key)
+    // Read key locally or from env
+    const fs = require('fs');
+    const path = require('path');
+    let privateKey;
+    try {
+        // Try to load /app/private.pem (Docker) or local
+        const keyPath = process.env.PRIVATE_KEY_PATH || path.join(__dirname, '../../private.pem');
+        privateKey = fs.readFileSync(keyPath, 'utf8');
+    } catch (e) {
+        console.error('CRITICAL: Private Key not found! using secret for fallback (unsafe)');
+        privateKey = process.env.JWT_SECRET; // Fallback only for dev
+    }
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' }); // 7 days token
+    const token = jwt.sign(payload, privateKey, { algorithm: 'RS256', expiresIn: '7d' });
 
     return {
         token,
