@@ -26,8 +26,9 @@ async function updateBackendkeys() {
             '/root/nadpos-backend/src/services/authService.js'
         );
 
-        console.log('--- 3. Restart Backend to apply changes ---');
-        await ssh.execCommand('docker-compose restart app', { cwd: '/root/nadpos-backend' });
+        console.log('--- 3. Rebuild and Restart Backend ---');
+        // Since we don't have volume mounts for source code in prod, we must rebuild.
+        await ssh.execCommand('docker-compose up -d --build app', { cwd: '/root/nadpos-backend' });
 
         console.log('backend updated with RSA keys.');
 

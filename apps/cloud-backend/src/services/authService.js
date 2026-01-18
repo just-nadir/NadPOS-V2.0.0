@@ -19,12 +19,21 @@ const login = async (email, password, hwid) => {
         throw new Error('Invalid password');
     }
 
-    // 3. License/Status Check (Optional logic here or in controller)
+    // 3. License/Status Check
     if (user.restaurant && user.restaurant.status !== 'active') {
         throw new Error('Restaurant is blocked or inactive');
     }
 
-    // 4. Update Token (Sign with RSA Private Key)
+    // 4. Update Token
+    const payload = {
+        uid: user.id,
+        rid: user.restaurant_id,
+        role: user.role,
+        plan: user.restaurant?.plan || 'basic',
+        hwid: hwid
+    };
+
+    // Sign with RSA Private Key
     // Read key locally or from env
     const fs = require('fs');
     const path = require('path');
