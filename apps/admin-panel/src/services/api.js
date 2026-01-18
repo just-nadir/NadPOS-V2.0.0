@@ -2,7 +2,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 
 // VPS URL
-const API_URL = 'https://nadpos.uz/api';
+const API_URL = '/api';
 
 const api = axios.create({
     baseURL: API_URL,

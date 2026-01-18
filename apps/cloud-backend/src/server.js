@@ -30,6 +30,16 @@ app.get('*', (req, res) => {
     }
 });
 
+// Debugging Handlers
+process.on('uncaughtException', (err) => {
+    console.error('CRITICAL: Uncaught Exception:', err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('CRITICAL: Unhandled Rejection:', reason);
+});
+
 app.listen(PORT, () => {
     console.log(`☁️ Cloud Backend (PostgreSQL) running on http://localhost:${PORT}`);
 });

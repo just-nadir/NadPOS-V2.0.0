@@ -1,7 +1,19 @@
+# .env konfiguratsiyani o'qish
+if (Test-Path ".env") {
+    Get-Content ".env" | Where-Object { $_ -match '=' -and -not ($_ -match '^#') } | ForEach-Object {
+        $k, $v = $_.Split('=', 2)
+        Set-Variable -Name $k.Trim() -Value $v.Trim()
+    }
+}
+else {
+    Write-Error "Xatolik: .env fayl topilmadi. Iltimos, .env fayl yarating."
+    exit 1
+}
 
-$HOST_IP = "213.142.148.35"
-$USER = "root"
-$REMOTE_DIR = "/root/nadpos-backend"
+$HOST_IP = $SERVER_IP
+$USER = $SERVER_USER
+# $REMOTE_DIR .env dan olinadi, agar bo'lmasa default qiymat
+if (-not $REMOTE_DIR) { $REMOTE_DIR = "/root/nadpos-backend" }
 
 Write-Host "Deploy boshlandi: $HOST_IP ga ulanmoqda..." -ForegroundColor Green
 
@@ -27,7 +39,8 @@ Write-Host "Fayllar yuborilmoqda..."
 $dest = "${USER}@${HOST_IP}:${REMOTE_DIR}/"
 
 # Asosiy fayllar
-scp apps/cloud-backend/Dockerfile apps/cloud-backend/docker-compose.yml apps/cloud-backend/package.json apps/cloud-backend/server.js apps/cloud-backend/setup.sh apps/cloud-backend/adminController.js "$dest"
+# Asosiy fayllar
+scp -r apps/cloud-backend/src apps/cloud-backend/prisma apps/cloud-backend/Dockerfile apps/cloud-backend/docker-compose.yml apps/cloud-backend/package.json apps/cloud-backend/setup.sh "$dest"
 
 # Nginx papkasi
 Write-Host "Nginx config yuborilmoqda..."

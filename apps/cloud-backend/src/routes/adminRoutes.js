@@ -14,16 +14,16 @@ const authController = require('../controllers/authController');
 router.post('/login', adminController.login);
 
 // Protected
-router.get('/stats', authMiddleware.verifySuperAdmin, adminController.getStats);
-router.get('/restaurants', authMiddleware.verifySuperAdmin, adminController.getRestaurants);
-router.post('/create-restaurant', authMiddleware.verifySuperAdmin, adminController.createRestaurant);
+router.get('/stats', authMiddleware, superAdminMiddleware, adminController.getStats);
+router.get('/restaurants', authMiddleware, superAdminMiddleware, adminController.getRestaurants);
+router.post('/create-restaurant', authMiddleware, superAdminMiddleware, adminController.createRestaurant);
 
 // New Routes
-router.put('/restaurants/:id', authMiddleware.verifySuperAdmin, adminController.updateRestaurant);
-router.patch('/restaurants/:id/status', authMiddleware.verifySuperAdmin, adminController.updateRestaurantStatus);
-router.post('/restaurants/:id/reset-password', authMiddleware.verifySuperAdmin, adminController.resetRestaurantPassword);
-router.post('/change-password', authMiddleware.verifySuperAdmin, adminController.changeAdminPassword);
-router.get('/logs', authMiddleware.verifySuperAdmin, adminController.getLogs);
-router.get('/payments', authMiddleware.verifySuperAdmin, adminController.getPayments);
+router.put('/restaurants/:id', authMiddleware, superAdminMiddleware, adminController.updateRestaurant);
+router.patch('/restaurants/:id/status', authMiddleware, superAdminMiddleware, adminController.updateRestaurantStatus);
+router.post('/restaurants/:id/reset-password', authMiddleware, superAdminMiddleware, adminController.resetRestaurantPassword);
+router.post('/change-password', authMiddleware, superAdminMiddleware, adminController.changeAdminPassword);
+router.get('/logs', authMiddleware, superAdminMiddleware, adminController.getLogs);
+router.get('/payments', authMiddleware, superAdminMiddleware, adminController.getPayments);
 
 module.exports = router;
