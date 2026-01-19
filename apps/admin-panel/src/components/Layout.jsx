@@ -1,11 +1,11 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, Store, LogOut, Settings, DollarSign, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, Store, LogOut, Settings, DollarSign, BarChart2, Shield } from 'lucide-react';
 import clsx from 'clsx';
 
 const Layout = () => {
-    const { logout } = useAuth();
+    const { logout, user } = useAuth();
     const navigate = useNavigate();
 
     const handleLogout = () => {
@@ -29,6 +29,12 @@ const Layout = () => {
                     <NavItem to="/payments" icon={<DollarSign size={20} />} label="To'lovlar" />
                     <NavItem to="/logs" icon={<BarChart2 size={20} />} label="Audit Log" />
                     <NavItem to="/settings" icon={<Settings size={20} />} label="Sozlamalar" />
+
+                    {user?.role === 'super_admin' && (
+                        <div className="pt-4 mt-4 border-t border-gray-700">
+                            <NavItem to="/global-management" icon={<Shield size={20} className="text-red-400" />} label="Global Boshqaruv" />
+                        </div>
+                    )}
                 </nav>
 
                 <div className="p-4 border-t border-gray-700">

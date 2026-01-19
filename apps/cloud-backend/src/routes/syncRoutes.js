@@ -7,5 +7,6 @@ const { authMiddleware } = require('../middlewares/authMiddleware');
 router.use(authMiddleware);
 
 router.post('/push', syncController.push);
+router.get('/pull', syncController.pull);
 
 module.exports = router;

@@ -4,7 +4,7 @@ const log = require('electron-log');
 const { initDB, onChange } = require('./database.cjs');
 const startServer = require('./server.cjs');
 const registerIpcHandlers = require('./ipcHandlers.cjs');
-// const { startSyncService, setMainWindow } = require('./sync_service.cjs'); // Removed sync_service.cjs
+require('./services/syncService.cjs'); // Start Sync Service (Background)
 const { initUpdater } = require('./services/updaterService.cjs');
 
 // --- LOGGER SOZLAMALARI ---

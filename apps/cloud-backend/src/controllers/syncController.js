@@ -16,6 +16,23 @@ const push = async (req, res) => {
     }
 };
 
+const pull = async (req, res) => {
+    try {
+        const { last_sync } = req.query;
+        const { rid } = req.user;
+
+        if (!rid) return res.status(400).json({ error: 'Restaurant ID not found' });
+
+        const result = await syncService.pullData(rid, last_sync);
+        res.json(result);
+
+    } catch (error) {
+        console.error("Sync Pull Error:", error.message);
+        res.status(500).json({ error: 'Server Error during pull' });
+    }
+};
+
 module.exports = {
-    push
+    push,
+    pull
 };

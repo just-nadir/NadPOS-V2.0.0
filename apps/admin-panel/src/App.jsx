@@ -7,6 +7,7 @@ import Restaurants from './pages/Restaurants';
 import Settings from './pages/Settings';
 import Logs from './pages/Logs';
 import Payments from './pages/Payments';
+import GlobalManagement from './pages/GlobalManagement';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -35,6 +36,7 @@ function App() {
             <Route path="settings" element={<Settings />} />
             <Route path="logs" element={<Logs />} />
             <Route path="payments" element={<Payments />} />
+            <Route path="global-management" element={<GlobalManagement />} />
           </Route>
         </Routes>
       </Router>

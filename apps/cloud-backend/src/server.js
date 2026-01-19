@@ -7,6 +7,7 @@ const path = require('path');
 const authRoutes = require('./routes/authRoutes');
 const syncRoutes = require('./routes/syncRoutes');
 const adminRoutes = require('./routes/adminRoutes'); // Super Admin
+const superAdminRoutes = require('./routes/superAdminRoutes'); // New Dedicated Super Admin Routes
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/license', authRoutes); // Verify endpoint ham auth ichida
 app.use('/api/sync', syncRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/super-admin', superAdminRoutes);
 
 // --- SERVE ADMIN PANEL ---
 const publicPath = path.join(__dirname, '../public'); // Parent folder 'public'
