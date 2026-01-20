@@ -1,10 +1,10 @@
 import React from 'react';
-import clsx from 'clsx';
+import { cn } from '../../lib/utils';
 
 const Skeleton = ({ className, ...props }) => {
     return (
         <div
-            className={clsx("animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md", className)}
+            className={cn("animate-pulse rounded-md bg-gray-200 dark:bg-gray-700", className)}
             {...props}
         />
     );

@@ -1,46 +1,23 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
-import Layout from './components/Layout';
+
 import Restaurants from './pages/Restaurants';
-import Settings from './pages/Settings';
-import Logs from './pages/Logs';
-import Payments from './pages/Payments';
-import GlobalManagement from './pages/GlobalManagement';
 
-const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth();
-  if (loading) return <div>Loading...</div>;
-  if (!user) return <Navigate to="/login" />;
-  return children;
-};
-
-import { Toaster } from 'react-hot-toast';
+// Placeholder pages for now
+const Payments = () => <div className="p-8 text-2xl font-bold text-gray-800">To'lovlar Tarixi (Tez kunda)</div>;
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Toaster position="top-right" />
+    <Router>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <Routes>
-          <Route path="/login" element={<Login />} />
-
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }>
-            <Route index element={<Dashboard />} />
-            <Route path="restaurants" element={<Restaurants />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="logs" element={<Logs />} />
-            <Route path="payments" element={<Payments />} />
-            <Route path="global-management" element={<GlobalManagement />} />
-          </Route>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/restaurants" element={<Restaurants />} />
+          <Route path="/payments" element={<Payments />} />
         </Routes>
-      </Router>
-    </AuthProvider>
+      </div>
+    </Router>
   );
 }
 
