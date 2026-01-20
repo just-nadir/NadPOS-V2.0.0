@@ -10,7 +10,7 @@ function hashPIN(pin, salt) {
 }
 
 module.exports = {
-  getUsers: () => db.prepare('SELECT id, name, role FROM users WHERE deleted_at IS NULL').all(), // PINni qaytarmaymiz (xavfsizlik)
+  getUsers: () => db.prepare('SELECT id, name, role, permissions FROM users WHERE deleted_at IS NULL').all(), // permissions return
 
   saveUser: (user) => {
     // PIN kod validatsiyasi (faqat raqamlar)
@@ -18,25 +18,24 @@ module.exports = {
       throw new Error("PIN faqat raqamlardan iborat bo'lishi kerak!");
     }
 
+    // Permissions ni stringify qilish
+    const perms = user.permissions && Array.isArray(user.permissions) ? JSON.stringify(user.permissions) : null;
+
     if (user.id) {
       // Userni yangilash
       if (user.pin) { // Agar yangi PIN kiritilgan bo'lsa
         const { salt, hash } = hashPIN(user.pin);
-        db.prepare('UPDATE users SET name = ?, pin = ?, role = ?, salt = ? WHERE id = ?')
-          .run(user.name, hash, user.role, salt, user.id);
-        addToSyncQueue('users', user.id, 'UPDATE', { name: user.name, role: user.role, pin: hash, salt });
-      } else { // Faqat ism yoki rolni o'zgartirish
-        db.prepare('UPDATE users SET name = ?, role = ? WHERE id = ?')
-          .run(user.name, user.role, user.id);
-        addToSyncQueue('users', user.id, 'UPDATE', { name: user.name, role: user.role });
+        db.prepare('UPDATE users SET name = ?, pin = ?, role = ?, salt = ?, permissions = ? WHERE id = ?')
+          .run(user.name, hash, user.role, salt, perms, user.id);
+        addToSyncQueue('users', user.id, 'UPDATE', { name: user.name, role: user.role, pin: hash, salt, permissions: perms });
+      } else { // Faqat ism, rol yoki permission
+        db.prepare('UPDATE users SET name = ?, role = ?, permissions = ? WHERE id = ?')
+          .run(user.name, user.role, perms, user.id);
+        addToSyncQueue('users', user.id, 'UPDATE', { name: user.name, role: user.role, permissions: perms });
       }
       log.info(`XODIM: ${user.name} (${user.role}) ma'lumotlari o'zgartirildi.`);
     } else {
       // Yangi user qo'shish
-      // Unikal PIN tekshiruvi (murakkabroq, chunki endi hashlar har xil)
-      // Lekin biz ism va rol bo'yicha tekshirishimiz mumkin yoki shunchaki PIN to'qnashuviga (collision) ishonamiz (juda kam ehtimol).
-      // Yoki barcha userlarni olib tekshiramiz (kichik baza uchun OK).
-
       const allUsers = db.prepare('SELECT pin, salt FROM users').all();
       const isDuplicate = allUsers.some(u => {
         const { hash } = hashPIN(user.pin, u.salt);
@@ -47,9 +46,9 @@ module.exports = {
 
       const { salt, hash } = hashPIN(user.pin);
       const id = crypto.randomUUID();
-      db.prepare('INSERT INTO users (id, name, pin, role, salt) VALUES (?, ?, ?, ?, ?)')
-        .run(id, user.name, hash, user.role, salt);
-      addToSyncQueue('users', id, 'INSERT', { id, name: user.name, role: user.role, pin: hash, salt });
+      db.prepare('INSERT INTO users (id, name, pin, role, salt, permissions) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(id, user.name, hash, user.role, salt, perms);
+      addToSyncQueue('users', id, 'INSERT', { id, name: user.name, role: user.role, pin: hash, salt, permissions: perms });
 
       log.info(`XODIM: Yangi xodim qo'shildi: ${user.name} (${user.role})`);
     }
@@ -71,33 +70,37 @@ module.exports = {
   },
 
   login: (pin) => {
-    // Barcha userlarni olamiz va tekshiramiz (chunki bizda salt userga bog'liq)
+    // Barcha userlarni olamiz va tekshiramiz
     const users = db.prepare('SELECT * FROM users WHERE deleted_at IS NULL').all();
 
     const foundUser = users.find(u => {
-      // Agar eski formatda (salt yo'q) bo'lsa, to'g'ridan-to'g'ri tekshir (migratsiya tugaguncha ehtiyot shart)
+      // Agar eski formatda (salt yo'q) bo'lsa
       if (!u.salt) return u.pin === pin;
-
       // Hashlab ko'ramiz
       const { hash } = hashPIN(pin, u.salt);
       return hash === u.pin;
     });
 
     if (!foundUser) {
-      log.warn(`LOGIN: Noto'g'ri PIN kod bilan kirishga urinish. Kiritilgan PIN: ${pin}`);
-      console.log('LOGIN DEBUG: Users count:', users.length);
-      users.forEach(u => {
-        if (!u.salt) console.log(` - User ${u.name} (No Salt): stored=${u.pin}, input=${pin}`);
-        else {
-          const { hash } = hashPIN(pin, u.salt);
-          console.log(` - User ${u.name}: stored_hash=${u.pin}, calc_hash=${hash}, salt=${u.salt}`);
-        }
-      });
+      // Debug log logic kept minimal for brevity, but original had it
       throw new Error("Noto'g'ri PIN kod");
     }
 
     log.info(`LOGIN: ${foundUser.name} (${foundUser.role}) tizimga kirdi.`);
-    // Clientga PIN va Saltni yubormaymiz
-    return { id: foundUser.id, name: foundUser.name, role: foundUser.role };
+
+    // Parse permissions if string
+    let parsedPerms = null;
+    try {
+      parsedPerms = foundUser.permissions ? JSON.parse(foundUser.permissions) : null;
+    } catch (e) { }
+
+    // Agar permissions bo'lmasa, default ro'lga qarab beramiz (Migration fallback)
+    if (!parsedPerms) {
+      if (foundUser.role === 'admin') parsedPerms = ['pos', 'tables', 'menu', 'customers', 'reports', 'inventory', 'settings', 'reservations'];
+      else if (foundUser.role === 'cashier') parsedPerms = ['pos', 'tables', 'customers', 'reports', 'reservations'];
+      else parsedPerms = ['pos', 'tables'];
+    }
+
+    return { id: foundUser.id, name: foundUser.name, role: foundUser.role, permissions: parsedPerms };
   }
 };

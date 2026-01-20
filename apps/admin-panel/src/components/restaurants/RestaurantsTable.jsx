@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Search, Filter, MoreVertical, Shield, ShieldAlert, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Filter, MoreVertical, Shield, ShieldAlert, CheckCircle, XCircle, CreditCard } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import api from '../../services/api';
 import toast from 'react-hot-toast'; // We might need to install this or use simple alerts for now
 
-const RestaurantsTable = ({ restaurants, onStatusChange }) => {
+const RestaurantsTable = ({ restaurants, onStatusChange, onExtend }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
 
@@ -108,18 +108,27 @@ const RestaurantsTable = ({ restaurants, onStatusChange }) => {
                                         </div>
                                     </td>
                                     <td className="p-5 text-right">
-                                        <button
-                                            onClick={() => handleStatusToggle(r.id, r.status)}
-                                            className={cn(
-                                                "p-2 rounded-lg transition opacity-0 group-hover:opacity-100",
-                                                r.status === 'active'
-                                                    ? "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30"
-                                                    : "bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30"
-                                            )}
-                                            title={r.status === 'active' ? "Bloklash" : "Faollashtirish"}
-                                        >
-                                            {r.status === 'active' ? <ShieldAlert size={18} /> : <Shield size={18} />}
-                                        </button>
+                                        <div className="flex items-center gap-2 justify-end">
+                                            <button
+                                                onClick={() => handleStatusToggle(r.id, r.status)}
+                                                className={cn(
+                                                    "p-2 rounded-lg transition opacity-0 group-hover:opacity-100",
+                                                    r.status === 'active'
+                                                        ? "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30"
+                                                        : "bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30"
+                                                )}
+                                                title={r.status === 'active' ? "Bloklash" : "Faollashtirish"}
+                                            >
+                                                {r.status === 'active' ? <ShieldAlert size={18} /> : <Shield size={18} />}
+                                            </button>
+                                            <button
+                                                onClick={() => onExtend && onExtend(r)}
+                                                className="p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30 transition opacity-0 group-hover:opacity-100"
+                                                title="Litsenziyani Uzaytirish"
+                                            >
+                                                <CreditCard size={18} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))

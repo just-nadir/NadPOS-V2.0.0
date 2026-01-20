@@ -10,6 +10,10 @@ const getAllRestaurants = async (req, res) => {
                 users: {
                     where: { role: 'admin' },
                     select: { email: true }
+                },
+                licenses: {
+                    orderBy: { created_at: 'desc' },
+                    take: 1
                 }
             },
             orderBy: { created_at: 'desc' }
@@ -22,7 +26,7 @@ const getAllRestaurants = async (req, res) => {
             owner: r.users[0]?.email || 'Noma\'lum',
             phone: r.phone || '-', // Phone is on Restaurant model
             status: r.status,
-            expires_at: r.expires_at || 'Cheksiz', // license expiry logic if exists
+            expires_at: r.licenses?.[0]?.expires_at || r.expires_at || null, // Prioritize License table
             plan: r.plan
         }));
 
@@ -72,31 +76,49 @@ const createRestaurant = async (req, res) => {
             return res.status(400).json({ error: 'Bu email allaqachon ro\'yxatdan o\'tgan' });
         }
 
+        // Check if restaurant with same email exists
+        const existingRestaurant = await prisma.restaurant.findUnique({ where: { email } });
+        if (existingRestaurant) {
+            return res.status(400).json({ error: 'Bu email bilan restoran allaqachon mavjud' });
+        }
+
         // Hash Password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Transaction: Create Restaurant & Owner User
+        // Transaction: Create Restaurant & Owner User & Initial License
         const result = await prisma.$transaction(async (prisma) => {
             // 1. Create Restaurant
             const restaurant = await prisma.restaurant.create({
                 data: {
                     name,
-                    phone, // Assuming phone is on Restaurant model based on getAllRestaurants
+                    email, // Required by schema
+                    phone,
                     status: 'active',
-                    plan: plan || 'basic',
-                    expires_at: new Date(new Date().setMonth(new Date().getMonth() + 1)) // 1 month free
+                    plan: plan || 'basic'
+                    // expires_at removed
                 }
             });
 
             // 2. Create User (Admin) linked to Restaurant
             const user = await prisma.user.create({
                 data: {
-                    name: owner_name || 'Admin',
                     email,
                     password: hashedPassword,
                     role: 'admin',
-                    phone,
                     restaurant_id: restaurant.id
+                }
+            });
+
+            // 3. Create Initial License (1 month free)
+            const expiresAt = new Date();
+            expiresAt.setMonth(expiresAt.getMonth() + 1);
+
+            await prisma.license.create({
+                data: {
+                    key: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15), // Random key
+                    restaurant_id: restaurant.id,
+                    expires_at: expiresAt,
+                    status: 'active'
                 }
             });
 
@@ -107,7 +129,7 @@ const createRestaurant = async (req, res) => {
 
     } catch (error) {
         console.error('SuperAdmin Create Error:', error);
-        res.status(500).json({ error: 'Server Error' });
+        res.status(500).json({ error: error.message || 'Server Error' });
     }
 };
 
@@ -171,9 +193,109 @@ const getStats = async (req, res) => {
     }
 };
 
+// Generate License Key Manually
+const generateLicense = async (req, res) => {
+    try {
+        const { restaurantId, hwid, days } = req.body;
+        const authService = require('../services/authService'); // Lazy require to avoid circular dep if any
+
+        if (!restaurantId || !hwid) {
+            return res.status(400).json({ error: 'Restaurant ID va HWID talab qilinadi' });
+        }
+
+        const restaurant = await prisma.restaurant.findUnique({
+            where: { id: restaurantId },
+            include: { users: { where: { role: 'admin' } } }
+        });
+
+        if (!restaurant) {
+            return res.status(404).json({ error: 'Restoran topilmadi' });
+        }
+
+        const adminUser = restaurant.users[0];
+        if (!adminUser) {
+            return res.status(400).json({ error: 'Restoran admini topilmadi' });
+        }
+
+        // Validity period
+        const duration = days ? `${days}d` : '30d';
+
+        // Update expires_at in DB for record keeping -> REMOVED because Restaurant model doesn't have expires_at
+        // Only create License record
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + (parseInt(days) || 30));
+
+        // Wait, check if we need to update anything else on restaurant? No.
+        // But we might want to update status to 'active' if it was blocked due to expiry?
+        // Let's ensure status is active.
+        await prisma.restaurant.update({
+            where: { id: restaurantId },
+            data: { status: 'active' }
+        });
+
+        const payload = {
+            uid: adminUser.id,
+            rid: restaurant.id,
+            role: 'admin',
+            plan: restaurant.plan,
+            hwid: hwid
+        };
+
+        const token = authService.generateToken(payload, duration);
+
+        // Also save license record
+        await prisma.license.create({
+            data: {
+                key: token,
+                restaurant_id: restaurant.id,
+                hwid: hwid,
+                expires_at: expiresAt,
+                status: 'active'
+            }
+        });
+
+        res.json({ token, expires_at: expiresAt });
+
+    } catch (error) {
+        console.error('Generate License Error:', error);
+        res.status(500).json({ error: 'Server Error' });
+    }
+};
+
+// Get All Payments
+const getAllPayments = async (req, res) => {
+    try {
+        const payments = await prisma.payment.findMany({
+            include: {
+                restaurant: {
+                    select: { name: true, phone: true }
+                }
+            },
+            orderBy: { created_at: 'desc' }
+        });
+
+        const formatted = payments.map(p => ({
+            id: p.id,
+            restaurant: p.restaurant?.name || 'O\'chirilgan',
+            amount: p.amount,
+            currency: p.currency,
+            status: p.status,
+            method: p.method,
+            date: p.created_at
+        }));
+
+        res.json(formatted);
+    } catch (error) {
+        console.error('Get Payments Error:', error);
+        res.status(500).json({ error: 'Server Error' });
+    }
+};
+
 module.exports = {
     getAllRestaurants,
     toggleBlockRestaurant,
     getStats,
-    createRestaurant
+    createRestaurant,
+    generateLicense,
+    getAllPayments
 };

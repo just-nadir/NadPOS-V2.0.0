@@ -93,9 +93,20 @@ const Settings = () => {
 
 
   const [newKitchen, setNewKitchen] = useState({ name: '', printer_ip: '' });
-  const [newUser, setNewUser] = useState({ name: '', pin: '', role: 'waiter' });
+  const [newUser, setNewUser] = useState({ name: '', pin: '', role: 'waiter', permissions: ['pos', 'tables'] });
 
   const [modal, setModal] = useState({ isOpen: false, type: null, id: null, message: '' });
+
+  const PERMISSION_OPTIONS = [
+    { id: 'pos', label: 'Kassa (POS)' },
+    { id: 'tables', label: 'Zallar va Stollar' },
+    { id: 'reservations', label: 'Bronlar' },
+    { id: 'customers', label: 'Mijozlar' },
+    { id: 'menu', label: 'Menyu' },
+    { id: 'inventory', label: 'Ombor' },
+    { id: 'reports', label: 'Hisobotlar' },
+    { id: 'settings', label: 'Sozlamalar' },
+  ];
 
   const [settings, setSettings] = useState({
     printerReceiptIP: "",
@@ -134,7 +145,12 @@ const Settings = () => {
       setKitchens(kData);
 
       const uData = await ipcRenderer.invoke('get-users');
-      setUsers(uData);
+      // Permissionlarni parse qilish
+      const parsedUsers = uData.map(u => ({
+        ...u,
+        permissions: (typeof u.permissions === 'string') ? JSON.parse(u.permissions) : (u.permissions || [])
+      }));
+      setUsers(parsedUsers);
 
       const printers = await ipcRenderer.invoke('get-system-printers');
       setSystemPrinters(printers || []);
@@ -205,12 +221,23 @@ const Settings = () => {
     if (!newUser.name || !newUser.pin) return;
     try {
       await window.electron.ipcRenderer.invoke('save-user', newUser);
-      setNewUser({ name: '', pin: '', role: 'waiter' });
+      setNewUser({ name: '', pin: '', role: 'waiter', permissions: ['pos', 'tables'] });
       loadAllData();
       showNotify('success', "Xodim saqlandi!");
     } catch (err) {
       showNotify('error', err.message);
     }
+  };
+
+  const togglePermission = (permId) => {
+    setNewUser(prev => {
+      const current = prev.permissions || [];
+      if (current.includes(permId)) {
+        return { ...prev, permissions: current.filter(p => p !== permId) };
+      } else {
+        return { ...prev, permissions: [...current, permId] };
+      }
+    });
   };
 
 
@@ -301,6 +328,43 @@ const Settings = () => {
                 </div>
               </div>
             </div>
+
+            {/* --- RESTORE DATA --- */}
+            <div className="bg-card p-8 rounded-3xl shadow-sm border border-border">
+              <h3 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-3"><History size={28} className="text-red-500" /> Ma'lumotlarni Tiklash</h3>
+              <div className="space-y-4">
+                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800 flex items-start gap-3">
+                  <Shield className="text-red-500 mt-1" size={20} />
+                  <div>
+                    <p className="font-bold text-red-700 dark:text-red-400">Diqqat!</p>
+                    <p className="text-sm text-red-600/80 dark:text-red-300/80">Bu amal serverdagi barcha ma'lumotlarni ushbu kompyuterga qayta yuklaydi. Internet tezligiga qarab biroz vaqt olishi mumkin.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!confirm("Haqiqatan ham ma'lumotlarni qayta tiklamoqchimisiz?")) return;
+                    setLoading(true);
+                    try {
+                      const res = await window.electron.ipcRenderer.invoke('sync-restore');
+                      if (res.success) {
+                        showNotify('success', "Ma'lumotlar muvaffaqiyatli tiklandi!");
+                      } else {
+                        showNotify('error', "Xatolik: " + res.message);
+                      }
+                    } catch (e) {
+                      showNotify('error', "Tizim xatoligi shim.");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                  className="w-full h-14 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 rounded-xl font-bold transition-all flex items-center justify-center gap-3 border border-red-200 dark:border-red-800"
+                >
+                  {loading ? <RefreshCw className="animate-spin" /> : <Database size={20} />}
+                  Ma'lumotlarni Qayta Yuklash (Restore)
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -309,29 +373,51 @@ const Settings = () => {
           <div className="max-w-4xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="bg-card p-8 rounded-3xl shadow-sm border border-border">
               <h3 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-3"><Users size={28} className="text-blue-500" /> Xodim Qo'shish</h3>
-              <form onSubmit={handleSaveUser} className="grid grid-cols-12 gap-6 items-end">
-                <div className="col-span-12 md:col-span-4">
-                  <label className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wide">Ism</label>
-                  <input required type="text" value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} placeholder="Ali" className="w-full h-14 px-4 rounded-xl border border-border bg-secondary/20 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-bold text-lg text-foreground" />
-                </div>
-                <div className="col-span-6 md:col-span-3">
-                  <label className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wide">PIN Kod</label>
-                  <div className="relative">
-                    <Key size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <input required type="text" maxLength="4" value={newUser.pin} onChange={e => setNewUser({ ...newUser, pin: e.target.value.replace(/\D/g, '') })} placeholder="1234" className="w-full h-14 pl-12 pr-4 rounded-xl border border-border bg-secondary/20 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-mono text-xl font-bold text-center tracking-widest text-foreground" />
+              <form onSubmit={handleSaveUser} className="space-y-6">
+                <div className="grid grid-cols-12 gap-6 items-end">
+                  <div className="col-span-12 md:col-span-4">
+                    <label className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wide">Ism</label>
+                    <input required type="text" value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} placeholder="Ali" className="w-full h-14 px-4 rounded-xl border border-border bg-secondary/20 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-bold text-lg text-foreground" />
+                  </div>
+                  <div className="col-span-6 md:col-span-3">
+                    <label className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wide">PIN Kod</label>
+                    <div className="relative">
+                      <Key size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input required type="text" maxLength="4" value={newUser.pin} onChange={e => setNewUser({ ...newUser, pin: e.target.value.replace(/\D/g, '') })} placeholder="1234" className="w-full h-14 pl-12 pr-4 rounded-xl border border-border bg-secondary/20 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-mono text-xl font-bold text-center tracking-widest text-foreground" />
+                    </div>
+                  </div>
+                  <div className="col-span-6 md:col-span-3">
+                    <label className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wide">Rol</label>
+                    <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} className="w-full h-14 px-4 rounded-xl border border-border bg-secondary/20 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-bold text-lg text-foreground appearance-none">
+                      <option value="waiter">Ofitsiant</option>
+                      <option value="cashier">Kassir</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <div className="col-span-12 md:col-span-2">
+                    <button type="submit" className="w-full bg-blue-600 text-white h-14 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:scale-95 transition-all text-lg">Qo'shish</button>
                   </div>
                 </div>
-                <div className="col-span-6 md:col-span-3">
-                  <label className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wide">Rol</label>
-                  <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} className="w-full h-14 px-4 rounded-xl border border-border bg-secondary/20 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-bold text-lg text-foreground appearance-none">
-                    <option value="waiter">Ofitsiant</option>
-                    <option value="cashier">Kassir</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div className="col-span-12 md:col-span-2">
-                  <button type="submit" className="w-full bg-blue-600 text-white h-14 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:scale-95 transition-all text-lg">Qo'shish</button>
-                </div>
+
+                {/* Permissions Checkboxes */}
+                {newUser.role !== 'admin' && (
+                  <div className="bg-secondary/10 p-4 rounded-xl border border-border">
+                    <label className="block text-xs font-bold text-muted-foreground mb-3 uppercase tracking-wide">Ruxsatlar (Nimaga kira oladi?)</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {PERMISSION_OPTIONS.map(perm => (
+                        <label key={perm.id} className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-secondary/20">
+                          <input
+                            type="checkbox"
+                            checked={(newUser.permissions || []).includes(perm.id)}
+                            onChange={() => togglePermission(perm.id)}
+                            className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                          <span className="text-sm font-medium">{perm.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </form>
             </div>
 

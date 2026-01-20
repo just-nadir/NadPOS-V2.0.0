@@ -140,18 +140,45 @@ class SyncService {
 
         try {
             if (operation === 'INSERT' || operation === 'UPDATE') {
-                const columns = Object.keys(data);
-                const values = Object.values(data);
-                const placeholders = columns.map(() => '?').join(',');
-                const updates = columns.map(c => `${c}=?`).join(',');
+                // 1. Valid ustunlarni olish
+                const tableInfo = db.prepare(`PRAGMA table_info(${table})`).all();
+                const validColumns = tableInfo.map(col => col.name);
 
-                // INSERT OR REPLACE
-                const sql = `INSERT OR REPLACE INTO ${table} (${columns.join(',')}) VALUES (${placeholders})`;
-                db.prepare(sql).run(...values);
+                // 2. Faqat valid ustunlarni o'tkazish
+                const filteredData = {};
+                for (const key of Object.keys(data)) {
+                    if (validColumns.includes(key)) {
+                        filteredData[key] = data[key];
+                    }
+                }
+
+                if (Object.keys(filteredData).length === 0) return;
+
+                const columns = Object.keys(filteredData);
+                const values = Object.values(filteredData);
+
+                // Safe Upsert Logic: Check if exists
+                if (!filteredData.id && table !== 'settings') return; // ID required (except settings)
+
+                const id = filteredData.id || (table === 'settings' ? filteredData.key : null);
+                const idCol = table === 'settings' ? 'key' : 'id';
+
+                const exists = db.prepare(`SELECT 1 FROM ${table} WHERE ${idCol} = ?`).get(id);
+
+                if (exists) {
+                    // UPDATE
+                    const setClause = columns.map(c => `${c}=?`).join(',');
+                    const sql = `UPDATE ${table} SET ${setClause} WHERE ${idCol} = ?`;
+                    db.prepare(sql).run(...values, id);
+                } else {
+                    // INSERT
+                    const placeholders = columns.map(() => '?').join(',');
+                    const sql = `INSERT INTO ${table} (${columns.join(',')}) VALUES (${placeholders})`;
+                    db.prepare(sql).run(...values);
+                }
 
                 // Maxsus holat: Settings o'zgarsa, notify qilish kerak
                 // Bu yerda DB change ni chaqirishimiz mumkin, lekin loop bo'lmasligi uchun is_synced=1 qilishimiz kerak (serverdan keldi).
-                // Lekin better-sqlite3 da triggerlar yo'q, shunchaki yozamiz.
 
             } else if (operation === 'DELETE') {
                 const id = data.id;
@@ -179,8 +206,32 @@ class SyncService {
 
         this.isSyncing = true;
         try {
-            await this.push(token); // Oldingi logic -> push metodiga o'tkazildi deb faraz qilamiz yoki shu yerda qoladi
-            await this.pull(token); // Yangi pull logic
+            await this.push(token);
+            // await this.pull(token); // Auto-Pull olib tashlandi (Manual Restore)
+        } finally {
+            this.isSyncing = false;
+        }
+    }
+
+    async restore() {
+        if (this.isSyncing) return { success: false, message: "Jarayon ketmoqda..." };
+
+        const fs = require('fs');
+        const path = require('path');
+        const { app } = require('electron');
+        const tokenPath = path.join(app.getPath('userData'), 'license.key');
+        if (!fs.existsSync(tokenPath)) return { success: false, message: "Litsenziya topilmadi" };
+        const token = fs.readFileSync(tokenPath, 'utf8').trim();
+
+        this.isSyncing = true;
+        try {
+            log.info("🔄 Manual Restore Started...");
+            await this.pull(token);
+            log.info("✅ Manual Restore Completed");
+            return { success: true };
+        } catch (e) {
+            log.error("❌ Manual Restore Failed:", e);
+            return { success: false, message: e.message };
         } finally {
             this.isSyncing = false;
         }

@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Loader2, Lock, WifiOff, Server } from 'lucide-react';
+import { Loader2, Lock, WifiOff, Server, RefreshCw, AlertTriangle } from 'lucide-react';
 
 // Cloud Backend URL (Development)
-// Production da buni .env fayldan olish kerak
 const API_URL = 'https://nadpos.uz/api';
 
 const LicenseGuard = ({ children }) => {
-    const [status, setStatus] = useState('CHECKING'); // CHECKING | ACTIVE | LOCKED | OFFLINE_LOCKED
+    const [status, setStatus] = useState('CHECKING'); // CHECKING | ACTIVE | LOCKED | EXPIRED | MISSING
     const [licenseInfo, setLicenseInfo] = useState(null);
     const [hwid, setHwid] = useState('');
+    const [reason, setReason] = useState('');
 
     // Login Form State
     const [email, setEmail] = useState('');
@@ -23,24 +23,32 @@ const LicenseGuard = ({ children }) => {
 
     const checkLicense = async () => {
         try {
+            setLoading(true);
             // 1. HWID ni olish
             const currentHwid = await window.electron.ipcRenderer.invoke('license:get-hwid');
             setHwid(currentHwid);
 
-            // 2. Litsenziyani tekshirish (Lokal)
+            // 2. Litsenziyani tekshirish (Lokal + Sync)
             const license = await window.electron.ipcRenderer.invoke('license:get-info');
+
+            console.log("License Info:", license);
 
             if (license.status === 'ACTIVE' || license.status === 'GRACE_PERIOD') {
                 setStatus('ACTIVE');
                 setLicenseInfo(license);
+            } else if (license.status === 'MISSING') {
+                setStatus('MISSING');
             } else {
-                setStatus('LOCKED');
-                if (license.reason) setError(license.reason);
+                setStatus('LOCKED'); // EXPIRED, LOCKED, INVALID
+                setReason(license.reason || 'Litsenziya bilan muammo');
+                setLicenseInfo(license);
             }
         } catch (err) {
             console.error("License Check Error:", err);
             setStatus('LOCKED');
-            setError("Tizim xatosi: Litsenziyani tekshirib bo'lmadi");
+            setReason("Tizim xatosi: " + err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -84,10 +92,10 @@ const LicenseGuard = ({ children }) => {
 
     if (status === 'CHECKING') {
         return (
-            <div className="h-screen w-screen flex items-center justify-center bg-gray-100">
+            <div className="h-screen w-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
                 <div className="text-center">
                     <Loader2 className="h-10 w-10 animate-spin mx-auto text-blue-600 mb-4" />
-                    <p className="text-gray-500">Litsenziya tekshirilmoqda...</p>
+                    <p className="text-gray-500 dark:text-gray-400">Litsenziya tekshirilmoqda...</p>
                 </div>
             </div>
         );
@@ -97,7 +105,53 @@ const LicenseGuard = ({ children }) => {
         return children;
     }
 
-    // LOCKED SCREEN (Login Form)
+    // LOCKED / EXPIRED SCREEN
+    if (status === 'LOCKED') {
+        return (
+            <div className="h-screen w-screen flex items-center justify-center bg-slate-900 text-white p-4">
+                <div className="w-full max-w-md p-8 bg-slate-800 rounded-2xl shadow-2xl border border-red-500/50 text-center">
+                    <div className="bg-red-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ring-4 ring-red-500/20">
+                        <Lock className="h-10 w-10 text-red-500" />
+                    </div>
+
+                    <h1 className="text-2xl font-bold mb-2">Tizim Bloklangan</h1>
+                    <p className="text-red-400 font-medium text-lg mb-4">{reason}</p>
+
+                    {licenseInfo?.expires_at && (
+                        <p className="text-slate-400 text-sm mb-6 bg-slate-900/50 p-2 rounded">
+                            Tugash sanasi: {new Date(licenseInfo.expires_at).toLocaleDateString()}
+                        </p>
+                    )}
+
+                    <div className="space-y-4">
+                        <p className="text-slate-400 text-sm">
+                            Iltimos, Admin panel orqali to'lovni amalga oshiring va "Yangilash" tugmasini bosing.
+                        </p>
+
+                        <button
+                            onClick={checkLicense}
+                            disabled={loading}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2"
+                        >
+                            {loading ? <Loader2 className="animate-spin h-5 w-5" /> : <RefreshCw className="h-5 w-5" />}
+                            <span>Yangilash</span>
+                        </button>
+
+                        <div className="pt-4 border-t border-slate-700">
+                            <button
+                                onClick={() => setStatus('MISSING')} // Allow re-login
+                                className="text-sm text-slate-500 hover:text-white transition underline"
+                            >
+                                Boshqa akkauntga kirish
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    // LOGIN SCREEN (MISSING)
     return (
         <div className="h-screen w-screen flex items-center justify-center bg-slate-900 text-white">
             <div className="w-full max-w-md p-8 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700">
@@ -115,7 +169,8 @@ const LicenseGuard = ({ children }) => {
                 </div>
 
                 {error && (
-                    <div className="mb-6 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                    <div className="mb-6 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm flex items-center gap-2">
+                        <AlertTriangle size={16} />
                         {error}
                     </div>
                 )}

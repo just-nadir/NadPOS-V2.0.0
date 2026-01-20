@@ -26,7 +26,7 @@ const authMiddleware = (req, res, next) => {
     jwt.verify(token, publicKey, { algorithms: ['RS256'] }, (err, user) => {
         if (err) {
             console.error('JWT Verify Error:', err.message);
-            return res.status(403).json({ error: 'Token yaroqsiz' });
+            return res.status(401).json({ error: 'Token yaroqsiz' });
         }
         req.user = user;
         next();

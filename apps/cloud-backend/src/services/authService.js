@@ -2,6 +2,21 @@ const prisma = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// Helper: Sign Token
+const generateToken = (payload, expiresIn = '7d') => {
+    const fs = require('fs');
+    const path = require('path');
+    let privateKey;
+    try {
+        const keyPath = process.env.PRIVATE_KEY_PATH || path.join(__dirname, '../../private.pem');
+        privateKey = fs.readFileSync(keyPath, 'utf8');
+    } catch (e) {
+        console.error('CRITICAL: Private Key not found! using secret for fallback (unsafe)');
+        privateKey = process.env.JWT_SECRET;
+    }
+    return jwt.sign(payload, privateKey, { algorithm: 'RS256', expiresIn });
+};
+
 const login = async (email, password, hwid) => {
     // 1. Find User
     const user = await prisma.user.findUnique({
@@ -33,21 +48,7 @@ const login = async (email, password, hwid) => {
         hwid: hwid
     };
 
-    // Sign with RSA Private Key
-    // Read key locally or from env
-    const fs = require('fs');
-    const path = require('path');
-    let privateKey;
-    try {
-        // Try to load /app/private.pem (Docker) or local
-        const keyPath = process.env.PRIVATE_KEY_PATH || path.join(__dirname, '../../private.pem');
-        privateKey = fs.readFileSync(keyPath, 'utf8');
-    } catch (e) {
-        console.error('CRITICAL: Private Key not found! using secret for fallback (unsafe)');
-        privateKey = process.env.JWT_SECRET; // Fallback only for dev
-    }
-
-    const token = jwt.sign(payload, privateKey, { algorithm: 'RS256', expiresIn: '7d' });
+    const token = generateToken(payload, '7d'); // Default login duration
 
     return {
         token,
@@ -93,5 +94,6 @@ const registerAdmin = async (email, password, restaurantName) => {
 
 module.exports = {
     login,
-    registerAdmin
+    registerAdmin,
+    generateToken
 };

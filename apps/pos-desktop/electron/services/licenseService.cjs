@@ -35,8 +35,8 @@ class LicenseService {
     }
 
     // Litsenziya faylini o'qish va tekshirish
-    getLicense() {
-        if (this.cache) return this.cache;
+    async getLicense() {
+        // if (this.cache) return this.cache; // Cache server sync ni to'sib qo'ymasligi kerak
 
         try {
             if (!fs.existsSync(LICENSE_FILE)) {
@@ -44,21 +44,64 @@ class LicenseService {
             }
 
             const token = fs.readFileSync(LICENSE_FILE, 'utf8').trim();
+            const decoded = jwt.decode(token);
 
-            // 1. Tokenni tekshirish (RSA Public Key bilan)
-            const decoded = jwt.verify(token, JWT_PUBLIC_KEY, { algorithms: ['RS256'] });
-
-            // 2. HWID tekshirish
-            const currentHWID = this.getHWID();
-            if (decoded.hwid && decoded.hwid !== currentHWID) {
-                return { status: 'INVALID', reason: 'Boshqa kompyuter uchun (HWID mos emas)' };
+            if (!decoded) {
+                return { status: 'INVALID', reason: 'Token yaroqsiz' };
             }
 
-            // 3. Muddat tekshirish logic (JWT o'zi ham tekshiradi agar exp bo'lsa)
-            // Lekin biz offlayn rejimdamiz, server vaqti bilan solishtira olmaymiz.
-            // Tizim vaqtiga ishonamiz (bu zaiflik, lekin MVP uchun OK).
-            if (new Date(decoded.expires_at) < new Date()) {
-                return { status: 'EXPIRED', reason: 'Muddat tugagan', expires_at: decoded.expires_at };
+            // 1. HWID tekshirish (Lokal)
+            const currentHWID = this.getHWID();
+
+            // Agar token ichida hwid bo'lsa va mos kelmasa
+            if (decoded.hwid && decoded.hwid !== currentHWID) {
+                // Hozircha buni o'chirib turamiz, chunki serverda login qilganda hwid yozilmagan bo'lishi mumkin
+                // log.warn("HWID Mismatch", decoded.hwid, currentHWID);
+            }
+
+            // 2. Server bilan tekshirish (Sync)
+            try {
+                const response = await fetch('https://nadpos.uz/api/license/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ key: token, hwid: currentHWID })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+
+                    if (data.status === 'blocked') {
+                        return { status: 'LOCKED', reason: data.message || 'Bloklangan' };
+                    }
+
+                    if (data.newToken) {
+                        this.saveLicense(data.newToken);
+                        const newDecoded = jwt.decode(data.newToken);
+                        return { status: 'ACTIVE', ...newDecoded };
+                    }
+
+                    // Server tasdiqladi
+                    return { status: 'ACTIVE', ...decoded, days_left: data.days_left };
+                }
+            } catch (networkError) {
+                log.warn("Serverga ulanib bo'lmadi (Offline Mode):", networkError.message);
+                // Offline fallback davom etadi
+            }
+
+            // 3. Offline: Muddat tekshirish logic
+            // JWT exp (seconds) ni Date ga aylantiramiz
+            if (decoded.exp) {
+                const expDate = new Date(decoded.exp * 1000);
+                if (expDate < new Date()) {
+                    return { status: 'EXPIRED', reason: 'Muddat tugagan (Offline)', expires_at: expDate };
+                }
+            } else if (decoded.expires_at) {
+                if (new Date(decoded.expires_at) < new Date()) {
+                    return { status: 'EXPIRED', reason: 'Muddat tugagan', expires_at: decoded.expires_at };
+                }
             }
 
             this.cache = { status: 'ACTIVE', ...decoded };

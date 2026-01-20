@@ -3,12 +3,17 @@ import api from '../services/api';
 import Skeleton from '../components/common/Skeleton';
 import RestaurantsTable from '../components/restaurants/RestaurantsTable';
 import CreateRestaurantModal from '../components/restaurants/CreateRestaurantModal';
+import ExtendLicenseModal from '../components/restaurants/ExtendLicenseModal';
 import { Plus } from 'lucide-react';
 
 const Restaurants = () => {
     const [restaurants, setRestaurants] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+    // Extend License State
+    const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
+    const [selectedRestaurant, setSelectedRestaurant] = useState(null);
 
     useEffect(() => {
         fetchRestaurants();
@@ -26,9 +31,14 @@ const Restaurants = () => {
         }
     };
 
+    const handleExtend = (restaurant) => {
+        setSelectedRestaurant(restaurant);
+        setIsExtendModalOpen(true);
+    };
+
     if (loading) {
         return (
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="space-y-6">
                 <div className="flex justify-between items-center">
                     <Skeleton className="h-8 w-48" />
                     <Skeleton className="h-10 w-32 rounded-xl" />
@@ -39,7 +49,7 @@ const Restaurants = () => {
     }
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
+        <div className="space-y-6 animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -59,12 +69,21 @@ const Restaurants = () => {
             <RestaurantsTable
                 restaurants={restaurants}
                 onStatusChange={fetchRestaurants}
+                onExtend={handleExtend}
             />
 
             {/* Create Modal */}
             <CreateRestaurantModal
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={fetchRestaurants}
+            />
+
+            {/* Extend License Modal */}
+            <ExtendLicenseModal
+                isOpen={isExtendModalOpen}
+                onClose={() => setIsExtendModalOpen(false)}
+                restaurant={selectedRestaurant}
                 onSuccess={fetchRestaurants}
             />
         </div>

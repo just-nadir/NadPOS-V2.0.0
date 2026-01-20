@@ -28,12 +28,24 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user, onCloseShift, syncSta
 
   // Ruxsatlar mantiqi
   const filteredItems = menuItems.filter(item => {
+    // Agar permissions array mavjud bo'lsa, shundan foydalanamiz
+    if (user?.permissions && Array.isArray(user.permissions) && user.permissions.length > 0) {
+      return user.permissions.includes(item.id);
+    }
+
+    // FALLBACK: Agar permissionlar yo'q bo'lsa (eski userlar uchun), rolga qarab
     // Admin: Hammasi
     if (user?.role === 'admin') return true;
 
     // Kassir: Ombordan boshqa hammasi
     if (user?.role === 'cashier') {
       return item.id !== 'inventory';
+    }
+
+    // Ofitsiant: Faqat ruxsat etilganlar (Default)
+    // Legacy ofitsiantlar uchun minimal
+    if (user?.role === 'waiter') {
+      return ['pos', 'tables', 'menu'].includes(item.id);
     }
 
     return false;

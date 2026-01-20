@@ -17,19 +17,26 @@ app.use(express.json({ limit: '50mb' })); // Sync ma'lumotlari katta bo'lishi mu
 
 // API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/license', authRoutes); // Verify endpoint ham auth ichida
+app.use('/api/license', require('./routes/licenseRoutes')); // Dedicated license routes
 app.use('/api/sync', syncRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/super-admin', superAdminRoutes);
 
 // --- SERVE ADMIN PANEL ---
+// --- SERVE ADMIN PANEL ---
 const publicPath = path.join(__dirname, '../public'); // Parent folder 'public'
-app.use(express.static(publicPath));
+app.use('/admin', express.static(publicPath));
 
-app.get('*', (req, res) => {
+// Handle exact /admin and /admin/*
+app.get(['/admin', '/admin/*'], (req, res) => {
     if (!req.path.startsWith('/api')) {
         res.sendFile(path.join(publicPath, 'index.html'));
     }
+});
+
+// Redirect root to admin (Optional, but good UX)
+app.get('/', (req, res) => {
+    res.redirect('/admin');
 });
 
 // Debugging Handlers

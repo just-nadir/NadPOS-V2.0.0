@@ -13,15 +13,17 @@ import {
     Tooltip,
     ResponsiveContainer,
     BarChart,
-    Bar,
-    Legend
+    Bar
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
+
+import LicenseGeneratorModal from '../components/dashboard/LicenseGeneratorModal';
 
 const Dashboard = () => {
     const navigate = useNavigate();
     const [stats, setStats] = useState({ total_restaurants: 0, active_today: 0, mrr: 0, new_this_month: 0, revenue_chart: [], growth_chart: [] });
     const [loading, setLoading] = useState(true);
+    const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
 
     useEffect(() => {
         fetchStats();
@@ -43,7 +45,7 @@ const Dashboard = () => {
 
     if (loading) {
         return (
-            <div className="p-6 max-w-7xl mx-auto space-y-8">
+            <div className="space-y-8">
                 <Skeleton className="h-12 w-64 rounded-xl" />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}
@@ -57,7 +59,7 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-8 animate-in fade-in duration-500">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -135,49 +137,53 @@ const Dashboard = () => {
                                 <TrendingUp className="text-blue-500" size={20} />
                             </div>
                         </div>
-                        <div className="h-80">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={revenueData}>
-                                    <defs>
-                                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
-                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" opacity={0.5} />
-                                    <XAxis
-                                        dataKey="name"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
-                                        dy={10}
-                                    />
-                                    <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tickFormatter={(value) => `${value / 1000000}M`}
-                                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                            borderRadius: '12px',
-                                            border: 'none',
-                                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                                        }}
-                                        formatter={(value) => [`${value.toLocaleString()} UZS`, 'Daromad']}
-                                        cursor={{ stroke: '#3b82f6', strokeWidth: 2 }}
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="value"
-                                        stroke="#3b82f6"
-                                        strokeWidth={3}
-                                        fillOpacity={1}
-                                        fill="url(#colorRevenue)"
-                                    />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                        <div className="h-80 min-h-[320px] w-full">
+                            {revenueData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={revenueData}>
+                                        <defs>
+                                            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" opacity={0.5} />
+                                        <XAxis
+                                            dataKey="name"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                                            dy={10}
+                                        />
+                                        <YAxis
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tickFormatter={(value) => `${value / 1000000}M`}
+                                            tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                                borderRadius: '12px',
+                                                border: 'none',
+                                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                                            }}
+                                            formatter={(value) => [`${value.toLocaleString()} UZS`, 'Daromad']}
+                                            cursor={{ stroke: '#3b82f6', strokeWidth: 2 }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="value"
+                                            stroke="#3b82f6"
+                                            strokeWidth={3}
+                                            fillOpacity={1}
+                                            fill="url(#colorRevenue)"
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-gray-400">Ma'lumot yo'q</div>
+                            )}
                         </div>
                     </div>
 
@@ -189,19 +195,23 @@ const Dashboard = () => {
                                 <p className="text-sm text-gray-500 dark:text-gray-400">Yangi qo'shilgan restoranlar</p>
                             </div>
                         </div>
-                        <div className="h-64">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={growthData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" opacity={0.5} />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} dy={10} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                                        cursor={{ fill: 'transparent' }}
-                                    />
-                                    <Bar dataKey="active" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                        <div className="h-64 min-h-[256px] w-full">
+                            {growthData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={growthData}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" opacity={0.5} />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} dy={10} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                                            cursor={{ fill: 'transparent' }}
+                                        />
+                                        <Bar dataKey="active" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-gray-400">Ma'lumot yo'q</div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -212,7 +222,10 @@ const Dashboard = () => {
                     <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg shadow-indigo-500/20">
                         <h3 className="text-xl font-bold mb-2">Litsenziya Sotish</h3>
                         <p className="text-indigo-100 text-sm mb-6">Yangi restoran uchun litsenziya kalitini generatsiya qilish.</p>
-                        <button className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition shadow-sm">
+                        <button
+                            onClick={() => setIsLicenseModalOpen(true)}
+                            className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition shadow-sm"
+                        >
                             Kalit Yaratish
                         </button>
                     </div>
@@ -221,6 +234,11 @@ const Dashboard = () => {
                     <RecentActivity />
                 </div>
             </div>
+
+            <LicenseGeneratorModal
+                isOpen={isLicenseModalOpen}
+                onClose={() => setIsLicenseModalOpen(false)}
+            />
         </div>
     );
 };

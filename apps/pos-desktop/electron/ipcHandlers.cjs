@@ -52,7 +52,14 @@ function registerIpcHandlers(ipcMain) {
 
     ipcMain.handle('get-tables', () => tableController.getTables());
     ipcMain.handle('get-tables-by-hall', (e, id) => tableController.getTablesByHall(id));
-    ipcMain.handle('add-table', (e, { hallId, name }) => tableController.addTable(hallId, name));
+    ipcMain.handle('add-table', async (e, { hallId, name }) => {
+        try {
+            return tableController.addTable(hallId, name);
+        } catch (error) {
+            log.error('add-table error:', error);
+            throw error;
+        }
+    });
     ipcMain.handle('delete-table', (e, id) => tableController.deleteTable(id));
     ipcMain.handle('update-table-status', (e, { id, status }) => tableController.updateTableStatus(id, status));
     ipcMain.handle('move-table', (e, { fromTableId, toTableId }) => orderController.moveTable(fromTableId, toTableId));
@@ -159,7 +166,13 @@ function registerIpcHandlers(ipcMain) {
     ipcMain.handle('save-user', (e, user) => staffController.saveUser(user));
     ipcMain.handle('delete-user', (e, id) => staffController.deleteUser(id));
 
-    ipcMain.handle('get-system-printers', () => printerService.getPrinters());
+    ipcMain.handle('printer-test', (e, { printerName, type, port }) => printerService.testPrint(printerName, type, port));
+
+    // Sync
+    ipcMain.handle('sync-restore', async () => {
+        const syncService = require('./services/syncService.cjs');
+        return await syncService.restore();
+    });
 
     // ==========================================
     // 10. SHIFT MANAGEMENT (Smena) - YANGI

@@ -271,9 +271,15 @@ function createV2Tables() {
         name TEXT NOT NULL,
         pin TEXT UNIQUE,
         role TEXT DEFAULT 'waiter',
+        permissions TEXT, -- JSON array of allowed pages
         salt TEXT,
         server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP, deleted_at TEXT
     )`).run();
+
+    // Hotfix: Add permissions if missing
+    try {
+        db.prepare("ALTER TABLE users ADD COLUMN permissions TEXT").run();
+    } catch (e) { /* Column likely exists */ }
 
     // 7. Sozlamalar (KEY-VALUE bo'lgani uchun ID UUID bo'lishi shart emas, lekin sync uchun kerak)
     db.prepare(`CREATE TABLE IF NOT EXISTS settings(
