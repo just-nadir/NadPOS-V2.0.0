@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Filter, MoreVertical, Shield, ShieldAlert, CheckCircle, XCircle, CreditCard } from 'lucide-react';
+import { Search, Filter, MoreVertical, Shield, ShieldAlert, CheckCircle, XCircle, CreditCard, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import api from '../../services/api';
 import toast from 'react-hot-toast'; // We might need to install this or use simple alerts for now
@@ -25,6 +25,19 @@ const RestaurantsTable = ({ restaurants, onStatusChange, onExtend }) => {
             } catch (error) {
                 console.error("Status change error", error);
                 alert("Xatolik yuz berdi");
+            }
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (window.confirm("Rostdan ham ushbu restoranni butunlay o'chirib tashlamoqchimisiz? Barcha ma'lumotlar (to'lovlar, litsenziyalar, menyular) qayta tiklanmaydigan bo'lib o'chib ketadi!")) {
+            try {
+                await api.delete(`/super-admin/restaurants/${id}`);
+                onStatusChange(); // Refresh
+                alert("Restoran o'chirildi");
+            } catch (error) {
+                console.error("Delete error", error);
+                alert("O'chirishda xatolik");
             }
         }
     };
@@ -91,7 +104,10 @@ const RestaurantsTable = ({ restaurants, onStatusChange, onExtend }) => {
                                         </span>
                                     </td>
                                     <td className="p-5 text-sm text-gray-600 dark:text-gray-300">
-                                        {r.expires_at ? new Date(r.expires_at).toLocaleDateString() : 'Cheksiz'}
+                                        {r.expires_at ? (() => {
+                                            const d = new Date(r.expires_at);
+                                            return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`;
+                                        })() : 'Cheksiz'}
                                     </td>
                                     <td className="p-5">
                                         <div className="flex items-center gap-2">
@@ -127,6 +143,13 @@ const RestaurantsTable = ({ restaurants, onStatusChange, onExtend }) => {
                                                 title="Litsenziyani Uzaytirish"
                                             >
                                                 <CreditCard size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(r.id)}
+                                                className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 transition opacity-0 group-hover:opacity-100"
+                                                title="O'chirish"
+                                            >
+                                                <Trash2 size={18} />
                                             </button>
                                         </div>
                                     </td>

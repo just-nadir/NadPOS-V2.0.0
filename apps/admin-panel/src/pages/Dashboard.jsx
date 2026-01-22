@@ -67,10 +67,6 @@ const Dashboard = () => {
                     <p className="text-gray-500 dark:text-gray-400">Biznesingizning bugungi holati.</p>
                 </div>
                 <div className="flex gap-3">
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm font-medium text-sm">
-                        <Calendar size={18} />
-                        <span>Bugun</span>
-                    </button>
                     <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition font-medium text-sm">
                         <PlusCircle size={18} />
                         <span>Restoran Qo'shish</span>
@@ -102,7 +98,7 @@ const Dashboard = () => {
                 />
                 <ModernStatCard
                     title="Oylik Daromad"
-                    value={`${(stats.mrr / 1000000).toFixed(1)}M UZS`}
+                    value={`${stats.mrr?.toLocaleString('ru-RU')} UZS`}
                     icon={<DollarSign size={24} />}
                     color="amber"
                     trend="up"
@@ -219,19 +215,10 @@ const Dashboard = () => {
                 {/* Right Column (Activity & Quick Actions) */}
                 <div className="space-y-6">
                     {/* Quick Access Card */}
-                    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg shadow-indigo-500/20">
-                        <h3 className="text-xl font-bold mb-2">Litsenziya Sotish</h3>
-                        <p className="text-indigo-100 text-sm mb-6">Yangi restoran uchun litsenziya kalitini generatsiya qilish.</p>
-                        <button
-                            onClick={() => setIsLicenseModalOpen(true)}
-                            className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition shadow-sm"
-                        >
-                            Kalit Yaratish
-                        </button>
-                    </div>
+                    {/* Quick Access Card removed by request */}
 
                     {/* Recent Activity */}
-                    <RecentActivity />
+                    <RecentActivity activities={stats.recent_activity || []} />
                 </div>
             </div>
 

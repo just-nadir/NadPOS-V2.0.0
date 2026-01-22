@@ -35,8 +35,9 @@ class LicenseService {
     }
 
     // Litsenziya faylini o'qish va tekshirish
-    async getLicense() {
-        // if (this.cache) return this.cache; // Cache server sync ni to'sib qo'ymasligi kerak
+    async getLicense({ forceSync = false, verifyOnline = true } = {}) {
+        // Agar kesh bor bo'lsa va majburiy sinxronizatsiya so'ralmasa, keshni qaytar
+        if (this.cache && !forceSync && !verifyOnline) return this.cache;
 
         try {
             if (!fs.existsSync(LICENSE_FILE)) {
@@ -55,52 +56,81 @@ class LicenseService {
 
             // Agar token ichida hwid bo'lsa va mos kelmasa
             if (decoded.hwid && decoded.hwid !== currentHWID) {
-                // Hozircha buni o'chirib turamiz, chunki serverda login qilganda hwid yozilmagan bo'lishi mumkin
+                // Hozircha buni o'chirib turamiz
                 // log.warn("HWID Mismatch", decoded.hwid, currentHWID);
             }
 
             // 2. Server bilan tekshirish (Sync)
-            try {
-                const response = await fetch('https://nadpos.uz/api/license/verify', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ key: token, hwid: currentHWID })
-                });
+            // Agar verifyOnline = false bo'lsa, server qismini o'tkazib yuboramiz
+            if (verifyOnline) {
+                try {
+                    // Token ichidan haqiqiy kalitni olamiz (yangi tizim), yoki butun tokenni yuboramiz (eski tizim faqat DB da token bo'lsa ishlaydi)
+                    const payloadKey = decoded.key || token;
 
-                if (response.ok) {
-                    const data = await response.json();
+                    console.log("Fetching license from server...", { key: payloadKey.substring(0, 15) + '...', hwid: currentHWID });
+                    const response = await fetch('https://nadpos.uz/api/license/verify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ key: payloadKey, hwid: currentHWID })
+                    });
 
-                    if (data.status === 'blocked') {
-                        return { status: 'LOCKED', reason: data.message || 'Bloklangan' };
+                    console.log("Server Response Status:", response.status, response.statusText);
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('License Server Response Body:', data);
+
+                        if (data.status === 'blocked') {
+                            return { status: 'LOCKED', reason: data.message || 'Bloklangan' };
+                        }
+
+                        if (data.status === 'expired') {
+                            return {
+                                status: 'EXPIRED',
+                                reason: data.message || 'Muddat tugagan',
+                                expires_at: data.expires_at
+                            };
+                        }
+
+                        if (data.newToken) {
+                            this.saveLicense(data.newToken);
+                            const newDecoded = jwt.decode(data.newToken);
+                            return { status: 'ACTIVE', ...newDecoded };
+                        }
+
+                        // Server tasdiqladi (Active)
+                        return { status: 'ACTIVE', ...decoded, days_left: data.days_left };
+                    } else {
+                        console.warn("Server Error Response:", await response.text());
                     }
-
-                    if (data.newToken) {
-                        this.saveLicense(data.newToken);
-                        const newDecoded = jwt.decode(data.newToken);
-                        return { status: 'ACTIVE', ...newDecoded };
-                    }
-
-                    // Server tasdiqladi
-                    return { status: 'ACTIVE', ...decoded, days_left: data.days_left };
+                } catch (networkError) {
+                    log.warn("Serverga ulanib bo'lmadi (Offline Mode):", networkError.message);
+                    console.error("Fetch Error:", networkError);
+                    // Offline fallback davom etadi
                 }
-            } catch (networkError) {
-                log.warn("Serverga ulanib bo'lmadi (Offline Mode):", networkError.message);
-                // Offline fallback davom etadi
-            }
+            } // End if (verifyOnline)
 
             // 3. Offline: Muddat tekshirish logic
             // JWT exp (seconds) ni Date ga aylantiramiz
             if (decoded.exp) {
                 const expDate = new Date(decoded.exp * 1000);
                 if (expDate < new Date()) {
-                    return { status: 'EXPIRED', reason: 'Muddat tugagan (Offline)', expires_at: expDate };
+                    return {
+                        status: 'EXPIRED',
+                        reason: 'Muddat tugagan (Offline)',
+                        expires_at: expDate.toISOString()
+                    };
                 }
             } else if (decoded.expires_at) {
                 if (new Date(decoded.expires_at) < new Date()) {
-                    return { status: 'EXPIRED', reason: 'Muddat tugagan', expires_at: decoded.expires_at };
+                    return {
+                        status: 'EXPIRED',
+                        reason: 'Muddat tugagan',
+                        expires_at: new Date(decoded.expires_at).toISOString()
+                    };
                 }
             }
 

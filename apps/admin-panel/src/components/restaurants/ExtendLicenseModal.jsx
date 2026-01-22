@@ -11,9 +11,15 @@ const ExtendLicenseModal = ({ isOpen, onClose, restaurant, onSuccess }) => {
     const [duration, setDuration] = useState(1);
     const [amount, setAmount] = useState(300000);
 
+    const [specificDate, setSpecificDate] = useState('');
+
     useEffect(() => {
         if (isOpen && restaurant) {
             fetchCurrentLicense();
+            // Default specific date to tomorrow if needed
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            setSpecificDate(tomorrow.toISOString().split('T')[0]);
         }
     }, [isOpen, restaurant]);
 
@@ -33,7 +39,11 @@ const ExtendLicenseModal = ({ isOpen, onClose, restaurant, onSuccess }) => {
             const payload = {
                 restaurantId: restaurant.id,
                 amount: amount,
-                [periodType]: duration // months: 1 or days: 30
+                // periodType ga qarab payload jo'natamiz
+                ...(periodType === 'date'
+                    ? { specificDate: specificDate }
+                    : { [periodType]: duration }
+                )
             };
 
             await api.post('/super-admin/license/extend', payload);
@@ -63,8 +73,8 @@ const ExtendLicenseModal = ({ isOpen, onClose, restaurant, onSuccess }) => {
                     <p className="text-sm text-gray-500 mt-1">{restaurant?.name}</p>
                     {currentLicense && (
                         <div className={`mt-3 px-3 py-2 rounded-lg text-sm font-medium inline-block ${new Date(currentLicense.expires_at) < new Date()
-                                ? 'bg-red-100 text-red-600'
-                                : 'bg-green-100 text-green-600'
+                            ? 'bg-red-100 text-red-600'
+                            : 'bg-green-100 text-green-600'
                             }`}>
                             Tugash sanasi: {new Date(currentLicense.expires_at).toLocaleDateString()}
                         </div>
@@ -79,8 +89,8 @@ const ExtendLicenseModal = ({ isOpen, onClose, restaurant, onSuccess }) => {
                             type="button"
                             onClick={() => { setPeriodType('months'); setDuration(1); setAmount(300000); }}
                             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${periodType === 'months'
-                                    ? 'bg-white dark:bg-gray-600 text-blue-600 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                ? 'bg-white dark:bg-gray-600 text-blue-600 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
                                 }`}
                         >
                             Oy
@@ -89,29 +99,50 @@ const ExtendLicenseModal = ({ isOpen, onClose, restaurant, onSuccess }) => {
                             type="button"
                             onClick={() => { setPeriodType('days'); setDuration(7); setAmount(0); }}
                             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${periodType === 'days'
-                                    ? 'bg-white dark:bg-gray-600 text-blue-600 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                ? 'bg-white dark:bg-gray-600 text-blue-600 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
                                 }`}
                         >
                             Kun
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => { setPeriodType('date'); setAmount(0); }}
+                            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${periodType === 'date'
+                                ? 'bg-white dark:bg-gray-600 text-blue-600 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                }`}
+                        >
+                            Sana
+                        </button>
                     </div>
 
-                    {/* Duration Input */}
+                    {/* Duration Input / Date Picker */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Muddat ({periodType === 'months' ? 'Oy' : 'Kun'})
+                            {periodType === 'date' ? 'Tugash Sanasi' : `Muddat (${periodType === 'months' ? 'Oy' : 'Kun'})`}
                         </label>
                         <div className="relative">
                             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                            <input
-                                type="number"
-                                min="1"
-                                value={duration}
-                                onChange={(e) => setDuration(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
-                                required
-                            />
+
+                            {periodType === 'date' ? (
+                                <input
+                                    type="date"
+                                    value={specificDate}
+                                    onChange={(e) => setSpecificDate(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
+                                    required
+                                />
+                            ) : (
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={duration}
+                                    onChange={(e) => setDuration(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
+                                    required
+                                />
+                            )}
                         </div>
                     </div>
 

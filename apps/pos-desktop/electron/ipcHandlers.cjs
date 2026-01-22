@@ -24,7 +24,10 @@ function registerIpcHandlers(ipcMain) {
     // ==========================================
     // 0. LICENSE & ACTIVATION (SaaS)
     // ==========================================
-    ipcMain.handle('license:get-info', () => licenseService.getLicense());
+    ipcMain.handle('license:get-info', (e, args) => {
+        console.log('IPC: license:get-info called with:', args);
+        return licenseService.getLicense(args);
+    });
     ipcMain.handle('license:save-token', (e, token) => licenseService.saveLicense(token));
     ipcMain.handle('license:get-hwid', () => licenseService.getHWID());
 

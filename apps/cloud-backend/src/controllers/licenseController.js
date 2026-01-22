@@ -3,9 +3,9 @@ const prisma = require('../config/db');
 // --- Litsenziyani uzaytirish (Admin Panel uchun) ---
 exports.extendLicense = async (req, res) => {
     try {
-        const { restaurantId, months, days, amount } = req.body;
+        const { restaurantId, months, days, amount, specificDate } = req.body;
 
-        if (!restaurantId || (!months && !days)) {
+        if (!restaurantId || (!months && !days && !specificDate)) {
             return res.status(400).json({ error: 'Ma\'lumotlar yetarli emas' });
         }
 
@@ -24,7 +24,12 @@ exports.extendLicense = async (req, res) => {
         let newExpiresAt;
         const now = new Date();
 
-        if (license) {
+        if (specificDate) {
+            // Aniq sana belgilash
+            newExpiresAt = new Date(specificDate);
+            // Vaqtni kun o'rtasiga (12:00) qo'yamiz, timezone sakrashini oldini olish uchun
+            newExpiresAt.setHours(12, 0, 0, 0);
+        } else if (license) {
             // Agar muddati o'tib ketgan bo'lsa, bugundan boshlab qo'shamiz
             // Agar muddati hali bor bo'lsa, o'sha sanadan davom ettiramiz
             const currentExpireDate = new Date(license.expires_at);
@@ -33,7 +38,14 @@ exports.extendLicense = async (req, res) => {
             newExpiresAt = new Date(baseDate);
             if (months) newExpiresAt.setMonth(newExpiresAt.getMonth() + parseInt(months));
             if (days) newExpiresAt.setDate(newExpiresAt.getDate() + parseInt(days));
+        } else {
+            // Create new
+            newExpiresAt = new Date();
+            if (months) newExpiresAt.setMonth(newExpiresAt.getMonth() + parseInt(months));
+            if (days) newExpiresAt.setDate(newExpiresAt.getDate() + parseInt(days));
+        }
 
+        if (license) {
             // Update
             license = await prisma.license.update({
                 where: { id: license.id },
@@ -44,10 +56,6 @@ exports.extendLicense = async (req, res) => {
             });
         } else {
             // Create new
-            newExpiresAt = new Date();
-            if (months) newExpiresAt.setMonth(newExpiresAt.getMonth() + parseInt(months));
-            if (days) newExpiresAt.setDate(newExpiresAt.getDate() + parseInt(days));
-
             // Generate random key
             const key = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
@@ -89,74 +97,131 @@ exports.extendLicense = async (req, res) => {
 
 // --- Litsenziyani tekshirish (Desktop uchun) ---
 exports.verifyLicense = async (req, res) => {
+    const { key, hwid } = req.body;
+    const jwt = require('jsonwebtoken'); // Ensure import
+
+    // 1. Tokenni headerdan olish va dekodlash (Resursni topish uchun)
+    const authHeader = req.headers.authorization;
+    let userFromToken = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+            const decoded = jwt.decode(token);
+            if (decoded && decoded.rid) {
+                userFromToken = decoded;
+            }
+        } catch (e) {
+            console.error("Token decode error:", e);
+        }
+    }
+
     try {
-        const { key, hwid } = req.body; // Key restoran ID si ham bo'lishi mumkin yoki litsenziya kaliti
-
-        // Bizda desktopda restoran ID si bormi yoki faqat Key?
-        // Keling, desktop serverga so'rov yuborganda restaurantId ni headerda yoki body da yuboradi deb faraz qilaylik, 
-        // Yoki Key orqali topamiz.
-
-        // Agar Key bo'lsa:
         let license;
-        if (key) {
-            license = await prisma.license.findUnique({ where: { key } });
+        let restaurantBlocked = false;
+
+        // A. Agar Key bo'lsa va u JWT bo'lmasa (Qisqa Key bo'lsa)
+        if (key && !key.startsWith('eyJ')) {
+            license = await prisma.license.findUnique({
+                where: { key },
+                include: { restaurant: true }
+            });
         }
 
-        // Agar topilmasa headerdagi user -> restaurant dan topamiz (Desktopda login qilingan bo'lsa)
-        if (!license && req.user && req.user.restaurantId) {
+        // B. Agar Key topilmasa, Tokendagi Restaurant ID orqali izlaymiz (Fallback)
+        // req.user ISHLAMAYDI chunki middleware yo'q. userFromToken dan foydalanamiz.
+        if (!license && userFromToken && userFromToken.rid) {
             const rest = await prisma.restaurant.findUnique({
-                where: { id: req.user.restaurantId },
-                include: { licenses: true }
+                where: { id: userFromToken.rid },
+                include: { licenses: { orderBy: { created_at: 'desc' }, take: 1 } }
             });
-            if (rest && rest.licenses.length > 0) license = rest.licenses[0];
+
+            if (rest) {
+                // Restoran statusini tekshirish
+                if (rest.status !== 'active') {
+                    restaurantBlocked = true;
+                }
+
+                // Eng oxirgi litsenziyani olamiz
+                if (rest.licenses.length > 0) {
+                    license = rest.licenses[0];
+                    license.restaurant = rest;
+                }
+            }
+        }
+
+        // 0. BLOKLASHNI TEKSHIRISH (Eng muhimi)
+        if (restaurantBlocked || (license && license.restaurant && license.restaurant.status !== 'active')) {
+            return res.json({
+                status: 'blocked',
+                message: 'Restoran bloklangan',
+                reason: 'Admin tomonidan bloklangan'
+            });
         }
 
         if (!license) {
             return res.status(404).json({ status: 'error', message: 'Litsenziya topilmadi' });
         }
 
-        // MUDDATNI TEKSHIRISH
-        const now = new Date();
+        // 1. HWID tekshirish
+        if (license.hwid && license.hwid !== hwid) {
+            // return res.status(403).json({ status: 'error', message: 'Ushbu litsenziya boshqa qurilmaga biriktirilgan' });
+        }
+
+        // 2. Muddat tugaganini tekshirish
         const expiresAt = new Date(license.expires_at);
+        const now = new Date();
+        const daysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
 
         if (expiresAt < now) {
             return res.json({
-                status: 'blocked',
+                status: 'expired',
                 message: 'Litsenziya muddati tugagan',
                 expires_at: license.expires_at
             });
         }
 
-        // Agar litsenziya aktiv bo'lsa, yangi token generatsiya qilamiz
-        let newToken = null;
-        if (req.user) {
-            const authService = require('../services/authService');
-            const payload = {
-                uid: req.user.id,
-                rid: license.restaurant_id,
-                role: req.user.role,
-                plan: req.user.plan || 'basic',
-                hwid: hwid
-            };
-            const durationMs = expiresAt - now;
-            const durationDays = Math.max(1, Math.ceil(durationMs / (1000 * 60 * 60 * 24)));
+        // 3. Tokenni yangilash (Refresh Token Logic)
+        // Agar litsenziya active bo'lsa, yangi token beramiz (ma'lumotlarni yangilash uchun)
+        const authService = require('../services/authService');
 
-            try {
-                newToken = authService.generateToken(payload, `${durationDays}d`);
-                await prisma.license.update({ where: { id: license.id }, data: { key: newToken } });
-            } catch (e) { console.log('Token update skipped'); }
+        // Yangi payload
+        const payload = {
+            id: license.id, // License ID
+            rid: license.restaurant_id,
+            hwid: hwid,
+            role: userFromToken?.role || 'admin', // userFromToken dan rol
+            key: license.key, // Yangi tizimdagi kalit
+            plan: license.restaurant.plan
+        };
+
+        // Muddat: Database dagi expires_at gacha
+        // expiresIn ni hisoblash: 
+        const diffInSeconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
+        const duration = diffInSeconds > 0 ? diffInSeconds + 's' : '1h';
+
+        // Agar muddat juda kam qolgan bo'lsa (masalan 1 kundan kam)
+        if (diffInSeconds < 0) {
+            // Already handled by expired check above
         }
 
-        res.json({
+        // Yangi tokenni authService orqali yasash qiyin bo'lishi mumkin agar u faqat user token uchun moslashgan bo'lsa
+        // Lekin generateToken universal ishlaydi
+        const newToken = authService.generateToken(payload, duration);
+
+        // Update user stats or last seen? (Optional)
+
+        return res.json({
             status: 'active',
+            message: 'Litsenziya faol',
+            days_left: daysLeft,
             expires_at: license.expires_at,
-            days_left: Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)),
-            newToken
+            newToken: newToken // Client buni saqlab oladi
         });
 
     } catch (error) {
-        console.error("Verify License Error:", error);
-        res.status(500).json({ error: 'Server xatosi' });
+        console.error('Verify License Error:', error);
+        res.status(500).json({ status: 'error', message: 'Server xatosi: ' + error.message });
     }
 };
 

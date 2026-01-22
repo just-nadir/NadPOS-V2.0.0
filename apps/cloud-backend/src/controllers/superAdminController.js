@@ -20,15 +20,27 @@ const getAllRestaurants = async (req, res) => {
         });
 
         // Format data for frontend table
-        const formatted = restaurants.map(r => ({
-            id: r.id,
-            name: r.name,
-            owner: r.users[0]?.email || 'Noma\'lum',
-            phone: r.phone || '-', // Phone is on Restaurant model
-            status: r.status,
-            expires_at: r.licenses?.[0]?.expires_at || r.expires_at || null, // Prioritize License table
-            plan: r.plan
-        }));
+        const formatted = restaurants.map(r => {
+            const license = r.licenses?.[0];
+            const expiresAt = license?.expires_at || r.expires_at || null;
+
+            // Dinamik status: Agar muddati o'tgan bo'lsa, 'expired' deb qaytaraylik
+            // Yoki 'blocked' agar admin bloklagan bo'lsa
+            let dynamicStatus = r.status;
+            if (dynamicStatus === 'active' && expiresAt && new Date(expiresAt) < new Date()) {
+                dynamicStatus = 'expired';
+            }
+
+            return {
+                id: r.id,
+                name: r.name,
+                owner: r.users[0]?.email || 'Noma\'lum',
+                phone: r.phone || '-',
+                status: dynamicStatus, // Use dynamic status
+                expires_at: expiresAt,
+                plan: r.plan
+            };
+        });
 
         res.json(formatted);
     } catch (error) {
@@ -139,52 +151,120 @@ const getStats = async (req, res) => {
         const total_restaurants = await prisma.restaurant.count();
         const active_today = await prisma.restaurant.count({ where: { status: 'active' } });
 
-        // Calculate newly added restaurants in current month
+        // --- 1. New This Month ---
         const startOfMonth = new Date();
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
 
         const new_this_month = await prisma.restaurant.count({
+            where: { created_at: { gte: startOfMonth } }
+        });
+
+        // --- 2. MRR (Real Revenue from Payments in last 30 days) ---
+        // Yoki joriy oy tushumi desak to'g'riroq bo'ladi
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const recentPayments = await prisma.payment.findMany({
             where: {
-                created_at: {
-                    gte: startOfMonth
+                status: 'completed',
+                created_at: { gte: thirtyDaysAgo }
+            },
+            select: { amount: true }
+        });
+
+        const mrr = recentPayments.reduce((sum, p) => sum + p.amount, 0);
+
+
+        // --- 3. Revenue Chart (Last 6 Months) ---
+        const revenue_chart = [];
+        const growth_chart = [];
+
+        for (let i = 5; i >= 0; i--) {
+            const date = new Date();
+            date.setMonth(date.getMonth() - i);
+            date.setDate(1);
+            date.setHours(0, 0, 0, 0);
+
+            const nextMonth = new Date(date);
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+            const monthName = date.toLocaleString('default', { month: 'short' });
+
+            // Revenue for this month
+            const monthPayments = await prisma.payment.aggregate({
+                _sum: { amount: true },
+                where: {
+                    status: 'completed',
+                    created_at: { gte: date, lt: nextMonth }
                 }
-            }
+            });
+
+            // Growth (New Restaurants) for this month
+            const newRestaurants = await prisma.restaurant.count({
+                where: {
+                    created_at: { gte: date, lt: nextMonth }
+                }
+            });
+
+            revenue_chart.push({ name: monthName, value: monthPayments._sum.amount || 0 });
+            growth_chart.push({ name: monthName, active: newRestaurants });
+        }
+
+
+        // --- 4. Recent Activity (Combined Logs) ---
+        // So'nggi 5 to'lov
+        const latPayments = await prisma.payment.findMany({
+            take: 5,
+            orderBy: { created_at: 'desc' },
+            include: { restaurant: { select: { name: true } } }
         });
 
-        // MRR Calculation (Mock logic based on plan)
-        const restaurants = await prisma.restaurant.findMany({ select: { plan: true } });
-        let mrr = 0;
-        restaurants.forEach(r => {
-            if (r.plan === 'basic') mrr += 100000;
-            else if (r.plan === 'standard') mrr += 200000;
-            else if (r.plan === 'premium') mrr += 300000;
+        // So'nggi 5 yangi restoran
+        const latRestaurants = await prisma.restaurant.findMany({
+            take: 5,
+            orderBy: { created_at: 'desc' },
+            select: { id: true, name: true, created_at: true }
         });
 
-        // Mock Chart Data
-        const revenue_chart = [
-            { name: 'Jan', value: mrr * 0.8 },
-            { name: 'Feb', value: mrr * 0.9 },
-            { name: 'Mar', value: mrr * 0.95 },
-            { name: 'Apr', value: mrr },
-            { name: 'May', value: mrr * 1.1 },
-            { name: 'Jun', value: mrr * 1.2 },
-        ];
+        // Combine and Sort
+        let activities = [];
 
-        const growth_chart = [
-            { name: 'Jan', active: Math.max(0, total_restaurants - 5) },
-            { name: 'Feb', active: Math.max(0, total_restaurants - 4) },
-            { name: 'Mar', active: Math.max(0, total_restaurants - 2) },
-            { name: 'Apr', active: total_restaurants },
-        ];
+        latPayments.forEach(p => {
+            activities.push({
+                type: 'payment',
+                title: p.restaurant?.name || 'Noma\'lum',
+                desc: `${p.amount.toLocaleString()} UZS to'lov qildi`,
+                amount: p.amount,
+                time: p.created_at,
+                status: 'success'
+            });
+        });
+
+        latRestaurants.forEach(r => {
+            activities.push({
+                type: 'new_restaurant',
+                title: r.name,
+                desc: 'Tizimga yangi qo\'shildi',
+                amount: 0,
+                time: r.created_at,
+                status: 'info'
+            });
+        });
+
+        // Sort by time desc and take top 5
+        activities.sort((a, b) => new Date(b.time) - new Date(a.time));
+        activities = activities.slice(0, 5);
+
 
         res.json({
             total_restaurants,
             active_today,
-            new_this_month, // Newly added this month
-            mrr, // Monthly Recurring Revenue
+            new_this_month,
+            mrr,
             revenue_chart,
-            growth_chart
+            growth_chart,
+            recent_activity: activities // Frontda buni ishlatish kerak
         });
 
     } catch (error) {
@@ -233,20 +313,24 @@ const generateLicense = async (req, res) => {
             data: { status: 'active' }
         });
 
+        // Litsenziya Kaliti (Short Random Key)
+        const licenseKey = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
         const payload = {
             uid: adminUser.id,
             rid: restaurant.id,
             role: 'admin',
             plan: restaurant.plan,
-            hwid: hwid
+            hwid: hwid,
+            key: licenseKey // Payloadga kalitni qo'shamiz
         };
 
         const token = authService.generateToken(payload, duration);
 
-        // Also save license record
+        // Litsenziyani bazaga saqlash
         await prisma.license.create({
             data: {
-                key: token,
+                key: licenseKey, // Qisqa kalitni saqlaymiz
                 restaurant_id: restaurant.id,
                 hwid: hwid,
                 expires_at: expiresAt,
@@ -291,11 +375,39 @@ const getAllPayments = async (req, res) => {
     }
 };
 
+// Delete Restaurant (Danger Zone)
+const deleteRestaurant = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Transaction to clean up everything
+        await prisma.$transaction(async (prisma) => {
+            // 1. Delete dependent data manually where Cascade is not set or to be safe
+            await prisma.license.deleteMany({ where: { restaurant_id: id } });
+            await prisma.user.deleteMany({ where: { restaurant_id: id } });
+            await prisma.payment.deleteMany({ where: { restaurant_id: id } });
+
+            // Sync data (Halls, Tables, etc.) usually have onDelete: Cascade in schema, 
+            // but if not, we would need to delete them here too. 
+            // Assuming Schema has Cascade for Hall, Table, Category, Product.
+
+            // 2. Delete Restaurant
+            await prisma.restaurant.delete({ where: { id } });
+        });
+
+        res.json({ message: 'Restoran va uning barcha ma\'lumotlari o\'chirildi' });
+    } catch (error) {
+        console.error('Delete Restaurant Error:', error);
+        res.status(500).json({ error: 'O\'chirishda xatolik yuz berdi' });
+    }
+};
+
 module.exports = {
     getAllRestaurants,
     toggleBlockRestaurant,
     getStats,
     createRestaurant,
     generateLicense,
-    getAllPayments
+    getAllPayments,
+    deleteRestaurant
 };

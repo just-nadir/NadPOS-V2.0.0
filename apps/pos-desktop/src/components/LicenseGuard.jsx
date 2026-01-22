@@ -18,20 +18,40 @@ const LicenseGuard = ({ children }) => {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        checkLicense();
+        // 1. Dastlabki tezkor tekshirish (Faqat lokal fayl)
+        checkLicense({ verifyOnline: false });
+
+        // 2. Orqa fonda serverni tekshirish (Dastur ochilib bo'lgandan keyin)
+        const initBackgroundCheck = setTimeout(() => {
+            checkLicense({ verifyOnline: true, forceSync: true, silent: true });
+        }, 2000); // 2 sekunddan keyin serverni tekshiramiz
+
+        // 3. Har 1 daqiqada serverdan statusni tekshirish (Real-time bloklash)
+        const interval = setInterval(() => {
+            checkLicense({ verifyOnline: true, forceSync: true, silent: true });
+        }, 60000);
+
+        return () => {
+            clearInterval(interval);
+            clearTimeout(initBackgroundCheck);
+        };
     }, []);
 
-    const checkLicense = async () => {
+    const checkLicense = async ({ forceSync = false, verifyOnline = true, silent = false } = {}) => {
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
+
             // 1. HWID ni olish
-            const currentHwid = await window.electron.ipcRenderer.invoke('license:get-hwid');
-            setHwid(currentHwid);
+            if (!hwid) { // Optimize: agar hwid allaqachon bo'lsa qayta olmaslik
+                const currentHwid = await window.electron.ipcRenderer.invoke('license:get-hwid');
+                setHwid(currentHwid);
+            }
 
-            // 2. Litsenziyani tekshirish (Lokal + Sync)
-            const license = await window.electron.ipcRenderer.invoke('license:get-info');
+            // 2. Litsenziyani tekshirish
+            // verifyOnline: false bo'lsa juda tez qaytadi
+            const license = await window.electron.ipcRenderer.invoke('license:get-info', { forceSync, verifyOnline });
 
-            console.log("License Info:", license);
+            console.log("License Info (Online: " + verifyOnline + "):", license);
 
             if (license.status === 'ACTIVE' || license.status === 'GRACE_PERIOD') {
                 setStatus('ACTIVE');
@@ -46,9 +66,9 @@ const LicenseGuard = ({ children }) => {
         } catch (err) {
             console.error("License Check Error:", err);
             setStatus('LOCKED');
-            setReason("Tizim xatosi: " + err.message);
+            setReason("Xatolik: " + err.message);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -125,7 +145,7 @@ const LicenseGuard = ({ children }) => {
 
                     <div className="space-y-4">
                         <p className="text-slate-400 text-sm">
-                            Iltimos, Admin panel orqali to'lovni amalga oshiring va "Yangilash" tugmasini bosing.
+                            Iltimos, to'lovni amalga oshiring va "Yangilash" tugmasini bosing.
                         </p>
 
                         <button
@@ -137,14 +157,7 @@ const LicenseGuard = ({ children }) => {
                             <span>Yangilash</span>
                         </button>
 
-                        <div className="pt-4 border-t border-slate-700">
-                            <button
-                                onClick={() => setStatus('MISSING')} // Allow re-login
-                                className="text-sm text-slate-500 hover:text-white transition underline"
-                            >
-                                Boshqa akkauntga kirish
-                            </button>
-                        </div>
+
                     </div>
                 </div>
             </div>

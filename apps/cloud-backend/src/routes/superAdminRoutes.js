@@ -9,6 +9,7 @@ router.use(superAdminMiddleware);
 router.get('/restaurants', superAdminController.getAllRestaurants);
 router.post('/restaurants', superAdminController.createRestaurant); // Create
 router.put('/restaurants/:id/status', superAdminController.toggleBlockRestaurant);
+router.delete('/restaurants/:id', superAdminController.deleteRestaurant); // Delete
 router.get('/stats', superAdminController.getStats);
 // router.post('/generate-license', superAdminController.generateLicense); // Deprecated use extend instead
 
