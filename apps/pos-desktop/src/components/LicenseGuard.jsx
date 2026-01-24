@@ -139,7 +139,10 @@ const LicenseGuard = ({ children }) => {
 
                     {licenseInfo?.expires_at && (
                         <p className="text-slate-400 text-sm mb-6 bg-slate-900/50 p-2 rounded">
-                            Tugash sanasi: {new Date(licenseInfo.expires_at).toLocaleDateString()}
+                            Tugash sanasi: {(() => {
+                                const d = new Date(licenseInfo.expires_at);
+                                return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`;
+                            })()}
                         </p>
                     )}
 
