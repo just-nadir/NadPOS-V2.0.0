@@ -1,103 +1,121 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Lock, Phone, Loader2, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Lock, Mail, Loader2, ArrowRight } from 'lucide-react';
 
-const Login = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-
-    const { login } = useAuth();
+export default function Login() {
     const navigate = useNavigate();
+    const { login, testLogin } = useAuth();
+    const [loading, setLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        phone: '',
+        password: ''
+    });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
         setLoading(true);
 
-        const res = await login(email, password);
+        const result = await login(formData.phone, formData.password);
 
-        if (res.success) {
-            navigate('/');
+        if (result.success) {
+            // Role based redirect is handled in PrivateRoute mostly, but here we can force it too
+            // or just rely on state update. But let's check role from result or context if possible.
+            // Getting user from context immediately might not work due to state update async.
+            // But login function returns simulation success.
+            // We can check localstorage or decode token, but simplest is:
+            // The login function in AuthContext sets state. We can just navigate to root /admin or /dashboard
+            // Let's rely on the user object in localStorage which is set in login()
+            const user = JSON.parse(localStorage.getItem('user'));
+
+            if (user?.role === 'super_admin') {
+                navigate('/admin');
+            } else {
+                navigate('/dashboard');
+            }
         } else {
-            setError(res.message);
+            alert(result.message); // Simple alert for now, or use a toast
         }
         setLoading(false);
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
+        <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-background">
+            {/* Background Effects */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-primary/20 rounded-full blur-[120px] -z-10" />
+            <div className="absolute bottom-0 right-0 w-[600px] h-[500px] bg-secondary/10 rounded-full blur-[100px] -z-10" />
 
-                {/* Logo/Brand */}
-                <div className="flex justify-center mb-8">
-                    <div className="bg-blue-600 p-3 rounded-2xl shadow-lg shadow-blue-500/20">
-                        <Shield className="text-white w-10 h-10" />
+            <div className="w-full max-w-md p-8 relative">
+                <div className="absolute inset-0 bg-surface/30 backdrop-blur-xl rounded-2xl border border-white/10 -z-10 shadow-2xl" />
+
+                <div className="text-center mb-8">
+                    <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 mx-auto mb-4">
+                        <span className="text-2xl font-bold text-white">N</span>
                     </div>
+                    <h1 className="text-2xl font-bold text-white mb-2">Xush kelibsiz</h1>
+                    <p className="text-gray-400 text-sm">Biznesingizni boshqarish uchun tizimga kiring</p>
                 </div>
 
-                <div className="bg-white dark:bg-slate-950 rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
-                    <div className="p-8 pb-6">
-                        <h2 className="text-2xl font-bold text-center text-slate-800 dark:text-white mb-2">Xush Kelibsiz</h2>
-                        <p className="text-center text-slate-500 dark:text-slate-400 text-sm">NadPOS Admin tizimiga kirish</p>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Telefon raqam</label>
+                        <div className="relative">
+                            <Phone className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+                            <Input
+                                type="tel"
+                                placeholder="+998 90 123 45 67"
+                                className="pl-10"
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                required
+                            />
+                        </div>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="p-8 pt-0 space-y-5">
-                        {error && (
-                            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl text-sm font-medium border border-red-100 dark:border-red-800 flex items-center gap-3">
-                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                                {error}
-                            </div>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-gray-300">Parol</label>
+                            <a href="#" className="text-xs text-primary hover:text-primary-light">Parolni unutdingizmi?</a>
+                        </div>
+                        <div className="relative">
+                            <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+                            <Input
+                                type="password"
+                                placeholder="••••••••"
+                                className="pl-10"
+                                value={formData.password}
+                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <Button className="w-full" size="lg" disabled={loading}>
+                        {loading ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Tekshirilmoqda...
+                            </>
+                        ) : (
+                            <>
+                                Tizimga Kirish
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                            </>
                         )}
+                    </Button>
+                </form>
 
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-wide text-slate-500 ml-1">Email</label>
-                            <div className="relative group">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={20} />
-                                <input
-                                    type="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full h-12 pl-12 pr-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all font-medium"
-                                    placeholder="admin@example.com"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-wide text-slate-500 ml-1">Parol</label>
-                            <div className="relative group">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={20} />
-                                <input
-                                    type="password"
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full h-12 pl-12 pr-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all font-medium"
-                                    placeholder="••••••••"
-                                />
-                            </div>
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:active:scale-100 mt-4"
-                        >
-                            {loading ? <Loader2 className="animate-spin" /> : <>Kirish <ArrowRight size={20} /></>}
-                        </button>
-                    </form>
-
-                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 text-center border-t border-slate-100 dark:border-slate-800">
-                        <p className="text-xs text-slate-400 font-mono">v1.0.0 • Secure Admin Portal</p>
-                    </div>
+                <div className="mt-6 text-center">
+                    <p className="text-sm text-gray-500">
+                        Hali hisobingiz yo'qmi? <a href="#" className="text-primary hover:underline">Ro'yxatdan o'tish</a>
+                    </p>
                 </div>
+            </div>
+            <div className="absolute bottom-4 text-center w-full">
+                <p className="text-xs text-gray-600">© 2026 NadPOS. Secure Admin Panel.</p>
             </div>
         </div>
     );
-};
-
-export default Login;
+}

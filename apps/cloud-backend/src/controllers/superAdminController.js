@@ -36,6 +36,7 @@ const getAllRestaurants = async (req, res) => {
                 name: r.name,
                 owner: r.users[0]?.email || 'Noma\'lum',
                 phone: r.phone || '-',
+                payment_id: r.payment_id,
                 status: dynamicStatus, // Use dynamic status
                 expires_at: expiresAt,
                 plan: r.plan
@@ -77,21 +78,24 @@ const createRestaurant = async (req, res) => {
     try {
         const { name, owner_name, email, password, phone, plan } = req.body;
 
-        // Basic Validation
-        if (!name || !email || !password || !phone) {
-            return res.status(400).json({ error: 'Barcha maydonlar to\'ldirilishi shart' });
+        // Validation
+        if (!name || !password || !phone) {
+            return res.status(400).json({ error: 'Nomi, telefon va parol kiritilishi shart' });
         }
 
-        // Check if user exists
-        const existingUser = await prisma.user.findUnique({ where: { email } });
+        // Check if user exists (by phone)
+        const existingUser = await prisma.user.findUnique({ where: { phone } });
         if (existingUser) {
-            return res.status(400).json({ error: 'Bu email allaqachon ro\'yxatdan o\'tgan' });
+            return res.status(400).json({ error: 'Bu telefon raqam allaqachon ro\'yxatdan o\'tgan' });
         }
 
-        // Check if restaurant with same email exists
-        const existingRestaurant = await prisma.restaurant.findUnique({ where: { email } });
-        if (existingRestaurant) {
-            return res.status(400).json({ error: 'Bu email bilan restoran allaqachon mavjud' });
+        // Check if restaurant with same phone exists (optional, but good for data integrity)
+        // Note: Restaurant email is also unique in schema, so if email provided, check it
+        if (email) {
+            const existingRestaurantEmail = await prisma.restaurant.findUnique({ where: { email } });
+            if (existingRestaurantEmail) {
+                return res.status(400).json({ error: 'Bu email bilan restoran allaqachon mavjud' });
+            }
         }
 
         // Hash Password
@@ -103,17 +107,18 @@ const createRestaurant = async (req, res) => {
             const restaurant = await prisma.restaurant.create({
                 data: {
                     name,
-                    email, // Required by schema
+                    email: email || `${phone}@nadpos.uz`, // Auto-generate if missing
                     phone,
+                    payment_id: Math.floor(100000 + Math.random() * 900000).toString(), // Generate 6 digit random number
                     status: 'active',
                     plan: plan || 'basic'
-                    // expires_at removed
                 }
             });
 
             // 2. Create User (Admin) linked to Restaurant
             const user = await prisma.user.create({
                 data: {
+                    phone,
                     email,
                     password: hashedPassword,
                     role: 'admin',
@@ -127,7 +132,7 @@ const createRestaurant = async (req, res) => {
 
             await prisma.license.create({
                 data: {
-                    key: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15), // Random key
+                    key: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
                     restaurant_id: restaurant.id,
                     expires_at: expiresAt,
                     status: 'active'
@@ -142,6 +147,87 @@ const createRestaurant = async (req, res) => {
     } catch (error) {
         console.error('SuperAdmin Create Error:', error);
         res.status(500).json({ error: error.message || 'Server Error' });
+    }
+};
+
+// --- USER MANAGEMENT ---
+
+// Get All Users
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await prisma.user.findMany({
+            include: {
+                restaurant: {
+                    select: { name: true, status: true }
+                }
+            },
+            orderBy: { created_at: 'desc' }
+        });
+
+        const formatted = users.map(u => ({
+            id: u.id,
+            name: u.restaurant?.name || 'Tizim',
+            restaurant: u.restaurant?.name || '-', // Add explicit restaurant field
+            phone: u.phone,
+            email: u.email,
+            role: u.role,
+            status: u.restaurant?.status || 'active',
+            created_at: u.created_at
+        }));
+
+        res.json(formatted);
+    } catch (error) {
+        console.error('Get Users Error:', error);
+        res.status(500).json({ error: 'Server Error' });
+    }
+};
+
+// Block/Unblock User (Currently blocks their restaurant if they are admin)
+const toggleBlockUser = async (req, res) => {
+    // Note: Since User model doesn't have status, we assume we might block their restaurant 
+    // OR we should add status to User. For now, let's just log it or handle via restaurant blocking if possible.
+    // Frontend expects blocking user.
+    // Variant 1: Agar user admin bo'lsa, uning restoranini bloklaymiz.
+    try {
+        const { id } = req.params;
+        const { status } = req.body; // blocked, active
+
+        const user = await prisma.user.findUnique({ where: { id } });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (user.restaurant_id) {
+            await prisma.restaurant.update({
+                where: { id: user.restaurant_id },
+                data: { status }
+            });
+            res.json({ message: 'User (Restaurant) status updated', status });
+        } else {
+            // Super admin or staff without restaurant logic
+            res.status(400).json({ error: 'Cannot block this user type yet' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Reset Password
+const resetPassword = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { password } = req.body;
+
+        if (!password) return res.status(400).json({ error: 'New password required' });
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        await prisma.user.update({
+            where: { id },
+            data: { password: hashedPassword }
+        });
+
+        res.json({ message: 'Parol muvaffaqiyatli yangilandi' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 };
 
@@ -409,5 +495,119 @@ module.exports = {
     createRestaurant,
     generateLicense,
     getAllPayments,
-    deleteRestaurant
+    deleteRestaurant,
+    getAllUsers,
+    toggleBlockUser,
+    resetPassword,
+
+    // --- SETTINGS ---
+
+    // Update Profile (Self)
+    updateProfile: async (req, res) => {
+        try {
+            const userId = req.user.id; // From Auth Middleware
+            const { phone, password, old_password } = req.body;
+
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+
+            // Validate Old Password if changing password
+            if (password) {
+                if (!old_password) return res.status(400).json({ error: 'Eski parol kiritilishi shart' });
+                const valid = await bcrypt.compare(old_password, user.password);
+                if (!valid) return res.status(400).json({ error: 'Eski parol noto\'g\'ri' });
+            }
+
+            const data = {};
+            if (phone) data.phone = phone;
+            if (password) data.password = await bcrypt.hash(password, 10);
+
+            await prisma.user.update({
+                where: { id: userId },
+                data
+            });
+
+            res.json({ message: 'Profil yangilandi' });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    },
+
+    // Get Plans
+    getPlans: async (req, res) => {
+        try {
+            const plans = await prisma.plan.findMany({ orderBy: { price: 'asc' } });
+            res.json(plans);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    },
+
+    // Update/Create Plan
+    updatePlan: async (req, res) => {
+        try {
+            const { id } = req.params; // If "new", create
+            const { name, price, currency, interval, features, is_active } = req.body;
+
+            let plan;
+            if (id === 'new') {
+                plan = await prisma.plan.create({
+                    data: { name, price: parseFloat(price), currency, interval, features, is_active }
+                });
+            } else {
+                plan = await prisma.plan.update({
+                    where: { id },
+                    data: { name, price: parseFloat(price), currency, interval, features, is_active }
+                });
+            }
+            res.json(plan);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    },
+
+    // Get System Config
+    getConfig: async (req, res) => {
+        try {
+            // Upsert ensures it always exists
+            const config = await prisma.appConfig.upsert({
+                where: { id: 'config' },
+                update: {},
+                create: { id: 'config' }
+            });
+            res.json(config);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    },
+
+    // Update System Config
+    updateConfig: async (req, res) => {
+        try {
+            const { trial_days, currency } = req.body;
+            const config = await prisma.appConfig.update({
+                where: { id: 'config' },
+                data: { trial_days: parseInt(trial_days), currency }
+            });
+            res.json(config);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    },
+
+    // Update Restaurant Plan
+    updateRestaurantPlan: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { plan } = req.body;
+
+            await prisma.restaurant.update({
+                where: { id },
+                data: { plan }
+            });
+
+            res.json({ message: 'Tarif o\'zgartirildi' });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
 };

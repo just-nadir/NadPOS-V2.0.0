@@ -21,14 +21,9 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
-    const login = async (email, password) => {
+    const login = async (phone, password) => {
         try {
-            // NOTE: Hardware ID is irrelevant for admin panel login usually, unless strict check needed
-            // Admin Panel backend logic might expect it or not. Let's send simple login first.
-            // Based on authController.js: login(email, password, hwid)
-            // For web admin panel, hwid is not applicable really, maybe send 'web-admin-panel' or null.
-
-            const res = await api.post('/auth/login', { email, password, hwid: 'WEB_ADMIN_PANEL' });
+            const res = await api.post('/auth/login', { phone, password, hwid: 'WEB_ADMIN_PANEL' });
 
             const { token, user } = res.data;
 
@@ -57,11 +52,26 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    // TEST UCHUN FAKE LOGIN
+    const testLogin = (role) => {
+        const fakeUser = {
+            id: '123',
+            phone: role === 'super_admin' ? '+998901234567' : '+998991112233',
+            role: role,
+            name: role === 'super_admin' ? 'Super Admin' : 'Restoran Egasi'
+        };
+        setUser(fakeUser);
+        localStorage.setItem('user', JSON.stringify(fakeUser));
+        // Fake token
+        localStorage.setItem('token', 'fake-jwt-token');
+    };
+
     const value = {
         user,
         loading,
         login,
         logout,
+        testLogin,
         isAuthenticated: !!user
     };
 

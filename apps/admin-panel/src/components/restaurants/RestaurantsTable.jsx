@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { Search, Filter, MoreVertical, Shield, ShieldAlert, CheckCircle, XCircle, CreditCard, Trash2 } from 'lucide-react';
+import { Search, Filter, MoreVertical, Shield, ShieldAlert, CheckCircle, XCircle, CreditCard, Trash2, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import api from '../../services/api';
 import toast from 'react-hot-toast'; // We might need to install this or use simple alerts for now
 
-const RestaurantsTable = ({ restaurants, onStatusChange, onExtend }) => {
+const RestaurantsTable = ({ restaurants, onStatusChange, onExtend, onChangePlan }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
 
     const filteredRestaurants = restaurants.filter(r => {
         const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             r.owner.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            r.phone.includes(searchTerm);
+            r.phone.includes(searchTerm) ||
+            (r.payment_id && r.payment_id.includes(searchTerm));
         const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
         return matchesSearch && matchesStatus;
     });
@@ -50,7 +51,7 @@ const RestaurantsTable = ({ restaurants, onStatusChange, onExtend }) => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                     <input
                         type="text"
-                        placeholder="Qidirish (Nomi, Email, Tel...)"
+                        placeholder="Qidirish (Nomi, ID, Tel...)"
                         className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -89,7 +90,7 @@ const RestaurantsTable = ({ restaurants, onStatusChange, onExtend }) => {
                                 <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition group">
                                     <td className="p-5">
                                         <div className="font-semibold text-gray-800 dark:text-white">{r.name}</div>
-                                        <div className="text-xs text-gray-400">ID: {r.id.substring(0, 8)}...</div>
+                                        <div className="text-xs text-blue-500 font-mono font-medium mt-1">ID: {r.payment_id || '---'}</div>
                                     </td>
                                     <td className="p-5 text-gray-600 dark:text-gray-300">{r.owner}</td>
                                     <td className="p-5 text-gray-600 dark:text-gray-300">{r.phone}</td>
@@ -136,6 +137,13 @@ const RestaurantsTable = ({ restaurants, onStatusChange, onExtend }) => {
                                                 title={r.status === 'active' ? "Bloklash" : "Faollashtirish"}
                                             >
                                                 {r.status === 'active' ? <ShieldAlert size={18} /> : <Shield size={18} />}
+                                            </button>
+                                            <button
+                                                onClick={() => onChangePlan && onChangePlan(r)}
+                                                className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 transition opacity-0 group-hover:opacity-100"
+                                                title="Tarifni O'zgartirish"
+                                            >
+                                                <RefreshCw size={18} />
                                             </button>
                                             <button
                                                 onClick={() => onExtend && onExtend(r)}

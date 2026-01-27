@@ -1,4 +1,5 @@
 require('dotenv').config();
+// Server restarted for env update
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -21,6 +22,8 @@ app.use('/api/license', require('./routes/licenseRoutes')); // Dedicated license
 app.use('/api/sync', syncRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/super-admin', superAdminRoutes);
+app.use('/api/restaurant', require('./routes/restaurantRoutes')); // Restaurant Admin
+app.use('/api/contact', require('./routes/contactRoutes')); // Contact Form
 
 // --- SERVE ADMIN PANEL ---
 // --- SERVE ADMIN PANEL ---

@@ -28,7 +28,12 @@ const authMiddleware = (req, res, next) => {
             console.error('JWT Verify Error:', err.message);
             return res.status(401).json({ error: 'Token yaroqsiz' });
         }
-        req.user = user;
+        // Normalize user object from short JWT keys
+        req.user = {
+            ...user,
+            id: user.uid,
+            restaurantId: user.rid
+        };
         next();
     });
 };

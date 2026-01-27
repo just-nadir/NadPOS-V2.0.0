@@ -6,7 +6,8 @@
         "apps/pos-mobile",
         "apps/cloud-backend",
         "apps/admin-panel",
-        "apps/pos-desktop"
+        "apps/pos-desktop",
+        "apps/landing-page"
     ],
     "overrides": {
         "react": "18.3.1",

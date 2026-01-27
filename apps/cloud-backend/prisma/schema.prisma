@@ -14,6 +14,7 @@ model Restaurant {
   name        String
   email       String   @unique
   phone       String?
+  payment_id  String?  @unique // 6-digit ID for Payme etc.
   plan        String   @default("basic") // basic, standard, premium
   status      String   @default("active") // active, blocked, trial
   config      Json?    @default("{}")
@@ -36,9 +37,11 @@ model Restaurant {
   @@map("restaurants")
 }
 
+
 model User {
   id            String      @id @default(uuid())
-  email         String      @unique
+  email         String?     // Optional now
+  phone         String      @unique // New primary identifier
   password      String
   role          String      @default("admin") // super_admin, admin
   restaurant_id String?
@@ -191,4 +194,28 @@ model Payment {
   restaurant    Restaurant @relation(fields: [restaurant_id], references: [id])
 
   @@map("payments")
+}
+
+model Plan {
+  id          String   @id @default(uuid())
+  name        String   @unique // Basic, Standard, Premium
+  price       Float    @default(0)
+  currency    String   @default("UZS")
+  interval    String   @default("month") // month, year
+  features    Json?    // ["feature1", "feature2"]
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("plans")
+}
+
+model AppConfig {
+  id          String   @id @default("config") // Singleton row
+  trial_days  Int      @default(30)
+  currency    String   @default("UZS")
+  language    String   @default("uz")
+  updated_at  DateTime @updatedAt
+
+  @@map("app_config")
 }

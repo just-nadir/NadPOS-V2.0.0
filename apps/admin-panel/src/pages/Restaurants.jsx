@@ -4,6 +4,7 @@ import Skeleton from '../components/common/Skeleton';
 import RestaurantsTable from '../components/restaurants/RestaurantsTable';
 import CreateRestaurantModal from '../components/restaurants/CreateRestaurantModal';
 import ExtendLicenseModal from '../components/restaurants/ExtendLicenseModal';
+import ChangePlanModal from '../components/restaurants/ChangePlanModal';
 import { Plus } from 'lucide-react';
 
 const Restaurants = () => {
@@ -34,6 +35,14 @@ const Restaurants = () => {
     const handleExtend = (restaurant) => {
         setSelectedRestaurant(restaurant);
         setIsExtendModalOpen(true);
+    };
+
+    // Change Plan State
+    const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+
+    const handleChangePlan = (restaurant) => {
+        setSelectedRestaurant(restaurant);
+        setIsPlanModalOpen(true);
     };
 
     if (loading) {
@@ -70,6 +79,7 @@ const Restaurants = () => {
                 restaurants={restaurants}
                 onStatusChange={fetchRestaurants}
                 onExtend={handleExtend}
+                onChangePlan={handleChangePlan}
             />
 
             {/* Create Modal */}
@@ -83,6 +93,14 @@ const Restaurants = () => {
             <ExtendLicenseModal
                 isOpen={isExtendModalOpen}
                 onClose={() => setIsExtendModalOpen(false)}
+                restaurant={selectedRestaurant}
+                onSuccess={fetchRestaurants}
+            />
+
+            {/* Change Plan Modal */}
+            <ChangePlanModal
+                isOpen={isPlanModalOpen}
+                onClose={() => setIsPlanModalOpen(false)}
                 restaurant={selectedRestaurant}
                 onSuccess={fetchRestaurants}
             />

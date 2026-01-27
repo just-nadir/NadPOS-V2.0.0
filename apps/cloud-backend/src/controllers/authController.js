@@ -2,8 +2,8 @@ const authService = require('../services/authService');
 
 const login = async (req, res) => {
     try {
-        const { email, password, hwid } = req.body;
-        const result = await authService.login(email, password, hwid);
+        const { phone, password, hwid } = req.body;
+        const result = await authService.login(phone, password, hwid);
         res.json(result);
     } catch (error) {
         console.error("Login Error:", error.message);

@@ -17,26 +17,26 @@ const generateToken = (payload, expiresIn = '7d') => {
     return jwt.sign(payload, privateKey, { algorithm: 'RS256', expiresIn });
 };
 
-const login = async (email, password, hwid) => {
+const login = async (phone, password, hwid) => {
     // 1. Find User
     const user = await prisma.user.findUnique({
-        where: { email },
+        where: { phone },
         include: { restaurant: true } // Include restaurant details (e.g. plan)
     });
 
     if (!user) {
-        throw new Error('User not found');
+        throw new Error('Foydalanuvchi topilmadi');
     }
 
     // 2. Validate Password
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
-        throw new Error('Invalid password');
+        throw new Error('Parol noto\'g\'ri');
     }
 
     // 3. License/Status Check
     if (user.restaurant && user.restaurant.status !== 'active') {
-        throw new Error('Restaurant is blocked or inactive');
+        throw new Error('Restoran bloklangan yoki faol emas');
     }
 
     // 4. Update Token
@@ -55,6 +55,7 @@ const login = async (email, password, hwid) => {
         user: {
             id: user.id,
             email: user.email,
+            phone: user.phone,
             role: user.role,
             restaurant_id: user.restaurant_id,
             plan: user.restaurant?.plan,
@@ -63,7 +64,7 @@ const login = async (email, password, hwid) => {
     };
 };
 
-const registerAdmin = async (email, password, restaurantName) => {
+const registerAdmin = async (phone, password, restaurantName, email) => {
     // Used for Super Admin to create restaurant + admin
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -72,13 +73,15 @@ const registerAdmin = async (email, password, restaurantName) => {
         const restaurant = await prisma.restaurant.create({
             data: {
                 name: restaurantName,
-                email: email, // Restaurant email same as admin email initially
+                email: email || `${phone}@nadpos.uz`, // Fallback email
+                phone: phone,
                 plan: 'basic'
             }
         });
 
         const user = await prisma.user.create({
             data: {
+                phone,
                 email,
                 password: hashedPassword,
                 role: 'admin',
