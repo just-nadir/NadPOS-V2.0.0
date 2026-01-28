@@ -34,26 +34,50 @@ const features = [
     }
 ];
 
+import { motion } from 'framer-motion';
+
+// ... inside component ...
 export function Features() {
     return (
         <section id="features" className="py-24 bg-surface/30">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-3xl mx-auto mb-16">
-                    <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Barcha kerakli vositalar bitta tizimda</h2>
-                    <p className="text-gray-400 text-lg">
+                    <motion.h2
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.5 }}
+                        className="text-3xl md:text-5xl font-bold text-white mb-6"
+                    >
+                        Barcha kerakli vositalar bitta tizimda
+                    </motion.h2>
+                    <motion.p
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.5, delay: 0.1 }}
+                        className="text-gray-400 text-lg"
+                    >
                         NadPOS restoraningizning har bir jarayonini avtomatlashtirish uchun ishlab chiqilgan.
-                    </p>
+                    </motion.p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {features.map((feature, index) => (
-                        <div key={index} className="p-8 rounded-2xl bg-surface border border-white/5 hover:border-primary/50 transition-colors group">
+                        <motion.div
+                            key={index}
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 0.5, delay: index * 0.1 }}
+                            className="p-8 rounded-2xl bg-surface border border-white/5 hover:border-primary/50 transition-colors group"
+                        >
                             <div className="w-12 h-12 rounded-lg bg-background flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                                 {feature.icon}
                             </div>
                             <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
                             <p className="text-gray-400 leading-relaxed">{feature.description}</p>
-                        </div>
+                        </motion.div>
                     ))}
                 </div>
             </div>

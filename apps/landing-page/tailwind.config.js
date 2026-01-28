@@ -21,7 +21,7 @@ export default {
         surface: '#1e293b',    // Slate 800
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Outfit', 'Inter', 'system-ui', 'sans-serif'],
       },
     },
   },

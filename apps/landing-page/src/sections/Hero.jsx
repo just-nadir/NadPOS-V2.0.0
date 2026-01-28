@@ -3,6 +3,7 @@ import { Button } from '../components/ui/Button';
 import { motion } from 'framer-motion';
 import { ArrowRight, Download, Play, Headset, Zap, Users } from 'lucide-react';
 
+
 export function Hero({ onContactClick }) {
     return (
         <section className="relative pt-32 pb-20 overflow-hidden">
@@ -59,29 +60,7 @@ export function Hero({ onContactClick }) {
                     </div>
                 </motion.div>
 
-                {/* Dashboard Mockup */}
-                <motion.div
-                    initial={{ opacity: 0, y: 40 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.2 }}
-                    className="mt-20 relative mx-auto max-w-5xl rounded-xl border border-white/10 bg-surface/50 p-2 backdrop-blur shadow-2xl"
-                >
-                    <div className="rounded-lg overflow-hidden bg-background aspect-video flex items-center justify-center border border-white/5 relative">
-                        {/* Placeholder for dashboard screenshot */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-background to-surface flex flex-col items-center justify-center text-gray-600">
-                            <span className="text-6xl font-black opacity-10">DASHBOARD</span>
-                            <p className="mt-4 opacity-30">Tizim interfeysi ko'rinishi shu yerda bo'ladi</p>
-                        </div>
-                        {/* Mock UI Elements just for visuals if no image */}
-                        <div className="absolute top-4 left-4 right-4 h-12 bg-surface rounded flex items-center px-4 border border-white/5">
-                            <div className="w-3 h-3 rounded-full bg-red-500 mr-2" />
-                            <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2" />
-                            <div className="w-3 h-3 rounded-full bg-green-500" />
-                        </div>
-                    </div>
-                    <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-primary rounded-full blur-2xl opacity-50"></div>
-                    <div className="absolute -top-6 -left-6 w-32 h-32 bg-secondary rounded-full blur-2xl opacity-40"></div>
-                </motion.div>
+
             </div>
         </section>
     );

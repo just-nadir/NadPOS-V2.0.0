@@ -1,6 +1,14 @@
 import React from 'react';
 
-export function Footer() {
+export function Footer({ onContactClick }) {
+    const scrollToSection = (id) => (e) => {
+        e.preventDefault();
+        const element = document.getElementById(id);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
     return (
         <footer className="bg-surface border-t border-white/5 pt-16 pb-8">
             <div className="container mx-auto px-6">
@@ -17,27 +25,25 @@ export function Footer() {
                     <div>
                         <h4 className="text-white font-semibold mb-4">Mahsulot</h4>
                         <ul className="space-y-2">
-                            <li><a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Imkoniyatlar</a></li>
-                            <li><a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Yangiliklar</a></li>
-                            <li><a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Yo'l xaritasi</a></li>
+                            <li><a href="#features" onClick={scrollToSection('features')} className="text-gray-400 hover:text-white text-sm transition-colors">Imkoniyatlar</a></li>
+                            <li><a href="#how-it-works" onClick={scrollToSection('how-it-works')} className="text-gray-400 hover:text-white text-sm transition-colors">Qanday ishlaydi</a></li>
+                            <li><a href="#pricing" onClick={scrollToSection('pricing')} className="text-gray-400 hover:text-white text-sm transition-colors">Tariflar</a></li>
                         </ul>
                     </div>
 
                     <div>
                         <h4 className="text-white font-semibold mb-4">Kompaniya</h4>
                         <ul className="space-y-2">
-                            <li><a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Biz haqimizda</a></li>
-                            <li><a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Bog'lanish</a></li>
-                            <li><a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Hamkorlik</a></li>
+                            <li><button onClick={onContactClick} className="text-gray-400 hover:text-white text-sm transition-colors text-left">Bog'lanish</button></li>
+                            <li><button onClick={onContactClick} className="text-gray-400 hover:text-white text-sm transition-colors text-left">Hamkorlik</button></li>
                         </ul>
                     </div>
 
                     <div>
                         <h4 className="text-white font-semibold mb-4">Yordam</h4>
                         <ul className="space-y-2">
-                            <li><a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Qo'llanma</a></li>
-                            <li><a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">FAQ</a></li>
-                            <li><a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Qo'llab-quvvatlash</a></li>
+                            <li><a href="#faq" onClick={scrollToSection('faq')} className="text-gray-400 hover:text-white text-sm transition-colors">FAQ</a></li>
+                            <li><button onClick={onContactClick} className="text-gray-400 hover:text-white text-sm transition-colors text-left">Qo'llab-quvvatlash</button></li>
                         </ul>
                     </div>
                 </div>
@@ -45,9 +51,9 @@ export function Footer() {
                 <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
                     <p className="text-gray-500 text-sm">© 2026 NadPOS. Barcha huquqlar himoyalangan.</p>
                     <div className="flex items-center gap-6">
-                        <a href="#" className="text-gray-500 hover:text-primary text-sm transition-colors">Instagram</a>
-                        <a href="#" className="text-gray-500 hover:text-primary text-sm transition-colors">Telegram</a>
-                        <a href="#" className="text-gray-500 hover:text-primary text-sm transition-colors">Facebook</a>
+                        <a href="https://instagram.com/nadpos.uz" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-primary text-sm transition-colors">Instagram</a>
+                        <a href="https://t.me/nadir13" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-primary text-sm transition-colors">Telegram</a>
+                        <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-primary text-sm transition-colors">Facebook</a>
                     </div>
                 </div>
             </div>
