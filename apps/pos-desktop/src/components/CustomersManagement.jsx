@@ -298,20 +298,40 @@ const CustomersManagement = () => {
                     <User size={20} /> {selectedCustomer.phone}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-1 opacity-70">
-                    {selectedCustomer.debt > 0 ? "Joriy Qarz" : "Joriy Balans"}
-                  </p>
-                  <div className={cn("text-5xl font-black tracking-tighter", selectedCustomer.debt > 0 ? "text-destructive" : "text-green-600")}>
-                    {selectedCustomer.debt > 0 ? selectedCustomer.debt.toLocaleString() : selectedCustomer.balance.toLocaleString()}
-                    <span className="text-xl text-muted-foreground font-bold ml-2">so'm</span>
+
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={selectedCustomer.debt > 0}
+                      onClick={() => confirmDelete(selectedCustomer.id)}
+                      className={cn(
+                        "h-10 w-10 transition-all rounded-xl",
+                        selectedCustomer.debt > 0
+                          ? "text-muted-foreground/20 cursor-not-allowed"
+                          : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      )}
+                      title={selectedCustomer.debt > 0 ? "Qarzdor mijozni o'chirib bo'lmaydi" : "O'chirish"}
+                    >
+                      <Trash2 size={24} />
+                    </Button>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-1 opacity-70">
+                      {selectedCustomer.debt > 0 ? "Joriy Qarz" : "Joriy Balans"}
+                    </p>
+                    <div className={cn("text-5xl font-black tracking-tighter", selectedCustomer.debt > 0 ? "text-destructive" : "text-green-600")}>
+                      {selectedCustomer.debt > 0 ? selectedCustomer.debt.toLocaleString() : selectedCustomer.balance.toLocaleString()}
+                      <span className="text-xl text-muted-foreground font-bold ml-2">so'm</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* ACTIONS BAR */}
-              <div className="flex gap-4 mt-8">
-                {selectedCustomer.debt > 0 && (
+              {/* ACTIONS BAR - Only show if pay form is needed */}
+              {selectedCustomer.debt > 0 && (
+                <div className="flex gap-4 mt-8">
                   <form onSubmit={handlePayDebt} className="flex-1 bg-secondary/30 p-2 rounded-2xl border border-border flex gap-2 shadow-inner">
                     <div className="relative flex-1">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs uppercase tracking-wider">So'ndirish</span>
@@ -328,20 +348,8 @@ const CustomersManagement = () => {
                       <CheckCircle size={20} className="mr-2" /> To'lash
                     </Button>
                   </form>
-                )}
-                <Button
-                  variant="outline"
-                  disabled={selectedCustomer.debt > 0}
-                  onClick={() => confirmDelete(selectedCustomer.id)}
-                  className={cn(
-                    "bg-card border-border h-[74px] px-8 text-lg font-bold rounded-2xl border-2 transition-all active:scale-95",
-                    selectedCustomer.debt > 0 ? "text-muted-foreground cursor-not-allowed opacity-50" : "text-destructive hover:bg-destructive hover:text-white"
-                  )}
-                  title={selectedCustomer.debt > 0 ? "Qarzdor mijozni o'chirib bo'lmaydi" : ""}
-                >
-                  <Trash2 size={24} className="mr-2" /> O'chirish
-                </Button>
-              </div>
+                </div>
+              )}
             </div>
 
             {/* HISTORY */}

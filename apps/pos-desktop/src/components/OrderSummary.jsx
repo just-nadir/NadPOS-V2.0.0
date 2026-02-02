@@ -146,12 +146,9 @@ const OrderSummary = ({ table, onDeselect }) => {
 
   const service = useMemo(() => {
     const svcValue = Number(settings.serviceChargeValue) || 0;
-    if (settings.serviceChargeType === 'percent') {
-      return (subtotal * svcValue) / 100;
-    } else {
-      return guestsCount * svcValue;
-    }
-  }, [subtotal, settings.serviceChargeValue, settings.serviceChargeType, guestsCount]);
+    // Always calculate as percentage
+    return (subtotal * svcValue) / 100;
+  }, [subtotal, settings.serviceChargeValue]);
 
   const preTotal = subtotal + service;
 
@@ -396,7 +393,7 @@ const OrderSummary = ({ table, onDeselect }) => {
             </div>
 
             <div className="flex justify-between text-base font-medium text-muted-foreground">
-              <span>Xizmat ({settings.serviceChargeType === 'percent' ? `${settings.serviceChargeValue}%` : 'Fixed'}):</span>
+              <span>Xizmat ({settings.serviceChargeValue || 0}%):</span>
               <span className="text-foreground">{service.toLocaleString()}</span>
             </div>
 

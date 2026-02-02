@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Reorder } from 'framer-motion';
 import { Plus, Trash2, Power, X, ChefHat, Edit2, Search, Package, MoreVertical } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import { cn } from '../utils/cn';
@@ -105,6 +106,38 @@ const MenuManagement = () => {
 
   // Delete Modal State (kategoriyalar uchun)
   const [confirmCategoryDelete, setConfirmCategoryDelete] = useState({ isOpen: false, id: null });
+
+  // NEW: Reorder Handlers
+  const handleReorderCategories = async (newOrder) => {
+    setCategories(newOrder);
+    if (window.electron && window.electron.ipcRenderer) {
+      try {
+        await window.electron.ipcRenderer.invoke('update-categories-order', newOrder);
+      } catch (error) {
+        console.error("Failed to save category order", error);
+        loadData();
+      }
+    }
+  };
+
+  const handleReorderProducts = async (newFilteredProducts) => {
+    // Barcha mahsulotlar ro'yxatidagi boshqa kategoriyaga tegishli mahsulotlarni ajratib olamiz
+    const otherProducts = products.filter(p => p.category_id !== activeCategory);
+    // Yangi tartibdagi joriy kategoriya mahsulotlarini qo'shamiz
+    const updatedProducts = [...otherProducts, ...newFilteredProducts];
+
+    setProducts(updatedProducts);
+
+    if (window.electron && window.electron.ipcRenderer) {
+      try {
+        // Faqat shu kategoriyadagi mahsulotlar tartibini yangilash uchun yuboramiz
+        await window.electron.ipcRenderer.invoke('update-products-order', newFilteredProducts);
+      } catch (error) {
+        console.error("Failed to save product order", error);
+        loadData();
+      }
+    }
+  };
 
   const loadData = async () => {
     if (!window.electron) return;
@@ -239,65 +272,82 @@ const MenuManagement = () => {
           </form>
         )}
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {categories.map(cat => (
-            <div key={cat.id} className="relative group">
-              {editingCategoryId === cat.id ? (
-                // Tahrirlash rejimi
-                <form onSubmit={handleUpdateCategory} className="w-full bg-secondary/30 p-3 rounded-2xl border-2 border-primary animate-in zoom-in duration-200">
-                  <input
-                    autoFocus
-                    type="text"
-                    value={editCategoryName}
-                    onChange={(e) => setEditCategoryName(e.target.value)}
-                    className="w-full p-3 rounded-xl border border-border bg-background mb-3 text-lg text-foreground font-medium outline-none focus:ring-2 focus:ring-primary/20"
-                    placeholder="Kategoriya nomi"
-                  />
-                  <div className="flex gap-2">
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setEditingCategoryId(null)} className="flex-1 h-10 rounded-lg text-muted-foreground">Bekor</Button>
-                    <Button type="submit" size="sm" className="flex-1 h-10 rounded-lg font-bold">Saqlash</Button>
-                  </div>
-                </form>
-              ) : (
-                // Oddiy ko'rinish
-                <div
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={cn(
-                    "w-full px-5 py-4 rounded-2xl font-bold text-lg transition-all cursor-pointer flex items-center justify-between min-h-[64px] shadow-sm select-none active:scale-[0.98]",
-                    activeCategory === cat.id
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 translate-x-1"
-                      : "bg-background text-muted-foreground hover:bg-secondary hover:text-foreground border border-transparent hover:border-border"
-                  )}
-                >
-                  <span className="flex-1 text-left truncate tracking-wide">{cat.name}</span>
+        <div className="flex-1 overflow-y-auto p-4 bg-secondary/10 scrollbar-thin">
+          <Reorder.Group axis="y" values={categories} onReorder={handleReorderCategories} className="space-y-3">
+            {categories.map(cat => (
+              <Reorder.Item key={cat.id} value={cat}>
+                <div className="relative group">
+                  {editingCategoryId === cat.id ? (
+                    // Tahrirlash rejimi (o'zgarishsiz qoladi)
+                    <form onSubmit={handleUpdateCategory} className="w-full bg-secondary/30 p-3 rounded-2xl border-2 border-primary animate-in zoom-in duration-200">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={editCategoryName}
+                        onChange={(e) => setEditCategoryName(e.target.value)}
+                        className="w-full p-3 rounded-xl border border-border bg-background mb-3 text-lg text-foreground font-medium outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="Kategoriya nomi"
+                      />
+                      <div className="flex gap-2">
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setEditingCategoryId(null)} className="flex-1 h-10 rounded-lg text-muted-foreground">Bekor</Button>
+                        <Button type="submit" size="sm" className="flex-1 h-10 rounded-lg font-bold">Saqlash</Button>
+                      </div>
+                    </form>
+                  ) : (
+                    // Oddiy ko'rinish
+                    <div
+                      onClick={() => setActiveCategory(cat.id)}
+                      className={cn(
+                        "w-full px-5 py-4 rounded-2xl font-bold text-lg transition-all cursor-pointer flex items-center justify-between min-h-[64px] shadow-sm select-none active:scale-[0.98]",
+                        activeCategory === cat.id
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 translate-x-1"
+                          : "bg-background text-muted-foreground hover:bg-secondary hover:text-foreground border border-transparent hover:border-border"
+                      )}
+                    >
+                      <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                        {/* Drag Handle */}
+                        <div className="opacity-0 group-hover:opacity-30 cursor-grab active:cursor-grabbing transition-opacity mr-1 hidden lg:block">
+                          <svg width="4" height="12" viewBox="0 0 6 14" fill="currentColor">
+                            <path d="M2 2C2 2.55 1.55 3 1 3C0.45 3 0 2.55 0 2C0 1.45 0.45 1 1 1C1.55 1 2 1.45 2 2Z" />
+                            <path d="M2 7C2 7.55 1.55 8 1 8C0.45 8 0 7.55 0 7C0 6.45 0.45 6 1 6C1.55 6 2 6.45 2 7Z" />
+                            <path d="M2 12C2 12.55 1.55 13 1 13C0.45 13 0 12.55 0 12C0 11.45 0.45 11 1 11C1.55 11 2 11.45 2 12Z" />
+                            <path d="M6 2C6 2.55 5.55 3 5 3C4.45 3 4 2.55 4 2C4 1.45 4.45 1 5 1C5.55 1 6 1.45 6 2Z" />
+                            <path d="M6 7C6 7.55 5.55 8 5 8C4.45 8 4 7.55 4 7C4 6.45 4.45 6 5 6C5.55 6 6 6.45 6 7Z" />
+                            <path d="M6 12C6 12.55 5.55 13 5 13C4.45 13 4 12.55 4 12C4 11.45 4.45 11 5 11C5.55 11 6 11.45 6 12Z" />
+                          </svg>
+                        </div>
+                        <span className="truncate tracking-wide">{cat.name}</span>
+                      </div>
 
-                  {/* Tahrirlash va O'chirish tugmalari */}
-                  <div className={cn("flex items-center gap-2 transition-all duration-300", activeCategory === cat.id ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0")}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startEditCategory(cat);
-                      }}
-                      className="p-2 rounded-xl hover:bg-white/20 active:bg-white/30 transition-colors"
-                      title="Tahrirlash"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        confirmDeleteCategory(cat.id);
-                      }}
-                      className="p-2 rounded-xl hover:bg-red-500/80 active:bg-red-600 transition-colors text-white/90 hover:text-white"
-                      title="O'chirish"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
+                      {/* Tahrirlash va O'chirish tugmalari */}
+                      <div className={cn("flex items-center gap-2 transition-all duration-300", activeCategory === cat.id ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0")}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditCategory(cat);
+                          }}
+                          className="p-2 rounded-xl hover:bg-white/20 active:bg-white/30 transition-colors"
+                          title="Tahrirlash"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            confirmDeleteCategory(cat.id);
+                          }}
+                          className="p-2 rounded-xl hover:bg-red-500/80 active:bg-red-600 transition-colors text-white/90 hover:text-white"
+                          title="O'chirish"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              </Reorder.Item>
+            ))}
+          </Reorder.Group>
         </div>
       </div>
 
@@ -338,7 +388,7 @@ const MenuManagement = () => {
               <p className="text-2xl font-medium">Mahsulotlar topilmadi</p>
             </div>
           ) : (
-            <div className="divide-y divide-border">
+            <Reorder.Group axis="y" values={filteredProducts} onReorder={handleReorderProducts} className="divide-y divide-border">
               {/* Table Header */}
               <div className="grid grid-cols-12 gap-6 px-8 py-4 bg-muted/30 text-xs font-bold text-muted-foreground uppercase tracking-wider sticky top-0 backdrop-blur-md z-10 border-b border-border">
                 <div className="col-span-3">Nomi</div>
@@ -350,85 +400,90 @@ const MenuManagement = () => {
               </div>
 
               {filteredProducts.map(product => (
-                <div key={product.id} className="grid grid-cols-12 gap-6 px-8 py-5 items-center hover:bg-secondary/20 transition-colors group min-h-[80px]">
-
-                  {/* Name & Code */}
-                  <div className="col-span-3 flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-secondary/50 flex items-center justify-center text-muted-foreground font-bold text-xl shrink-0">
-                      {product.name.charAt(0).toUpperCase()}
+                <Reorder.Item key={product.id} value={product} as="div" className="relative">
+                  <div className="grid grid-cols-12 gap-6 px-8 py-5 items-center hover:bg-secondary/20 transition-colors group min-h-[80px] bg-background">
+                    {/* Name & Code */}
+                    <div className="col-span-3 flex items-center gap-3">
+                      {/* Drag Handle */}
+                      <div className="opacity-0 group-hover:opacity-30 cursor-grab active:cursor-grabbing transition-opacity -ml-6 w-6 flex justify-center">
+                        <MoreVertical size={16} />
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-secondary/50 flex items-center justify-center text-muted-foreground font-bold text-xl shrink-0">
+                        {product.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className={cn("font-bold text-lg text-foreground truncate", !product.is_active && "text-muted-foreground line-through decoration-2 decoration-destructive/50")}>{product.name}</h3>
+                        {product.unit_type === 'kg' && <Badge variant="outline" className="mt-1 text-[10px] bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/30 dark:border-orange-900 font-bold">KG</Badge>}
+                      </div>
                     </div>
-                    <div>
-                      <h3 className={cn("font-bold text-lg text-foreground truncate", !product.is_active && "text-muted-foreground line-through decoration-2 decoration-destructive/50")}>{product.name}</h3>
-                      {product.unit_type === 'kg' && <Badge variant="outline" className="mt-1 text-[10px] bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/30 dark:border-orange-900 font-bold">KG</Badge>}
+
+                    {/* Price */}
+                    <div className="col-span-2">
+                      <div className="font-black text-primary text-xl tracking-tight">
+                        {product.price.toLocaleString()} <span className="text-sm text-muted-foreground font-medium">so'm</span>
+                      </div>
+                    </div>
+
+                    {/* Stock (Qoldiq) */}
+                    <div className="col-span-2">
+                      <div className={cn("font-bold text-lg flex items-center gap-1.5", product.stock <= 5 && product.track_stock !== 0 ? "text-destructive" : "text-foreground")}>
+                        {product.track_stock === 0 ? (
+                          <span className="text-muted-foreground font-normal">-</span>
+                        ) : (
+                          <>{product.stock || 0} <span className="text-sm text-muted-foreground font-medium">{product.unit_type === 'kg' ? 'kg' : 'dona'}</span></>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Kitchen */}
+                    <div className="col-span-2">
+                      <span className="text-sm font-medium text-muted-foreground bg-secondary/50 px-3 py-1.5 rounded-lg truncate block w-fit max-w-full border border-border/50">
+                        {product.kitchen_name || '-'}
+                      </span>
+                    </div>
+
+                    {/* Active Toggle */}
+                    <div className="col-span-2">
+                      <button
+                        onClick={() => toggleStatus(product.id, product.is_active)}
+                        className={cn(
+                          "relative w-14 h-8 rounded-full transition-all duration-300 flex items-center px-1 shadow-inner",
+                          product.is_active ? "bg-green-500" : "bg-gray-300 dark:bg-slate-700"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 pointer-events-none",
+                          product.is_active ? "translate-x-6" : "translate-x-0"
+                        )} />
+                      </button>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="col-span-1 flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:bg-primary/10 hover:text-primary w-12 h-12 rounded-xl transition-all active:scale-95"
+                        onClick={() => {
+                          setNewProduct({ ...product, category_id: product.category_id, destination: String(product.destination) });
+                          setIsModalOpen(true);
+                        }}
+                      >
+                        <Edit2 size={22} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-12 h-12 rounded-xl transition-all active:scale-95"
+                        onClick={() => confirmDelete(product.id)}
+                      >
+                        <Trash2 size={22} />
+                      </Button>
                     </div>
                   </div>
-
-                  {/* Price */}
-                  <div className="col-span-2">
-                    <div className="font-black text-primary text-xl tracking-tight">
-                      {product.price.toLocaleString()} <span className="text-sm text-muted-foreground font-medium">so'm</span>
-                    </div>
-                  </div>
-
-                  {/* Stock (Qoldiq) */}
-                  <div className="col-span-2">
-                    <div className={cn("font-bold text-lg flex items-center gap-1.5", product.stock <= 5 && product.track_stock !== 0 ? "text-destructive" : "text-foreground")}>
-                      {product.track_stock === 0 ? (
-                        <span className="text-muted-foreground font-normal">-</span>
-                      ) : (
-                        <>{product.stock || 0} <span className="text-sm text-muted-foreground font-medium">{product.unit_type === 'kg' ? 'kg' : 'dona'}</span></>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Kitchen */}
-                  <div className="col-span-2">
-                    <span className="text-sm font-medium text-muted-foreground bg-secondary/50 px-3 py-1.5 rounded-lg truncate block w-fit max-w-full border border-border/50">
-                      {product.kitchen_name || '-'}
-                    </span>
-                  </div>
-
-                  {/* Active Toggle */}
-                  <div className="col-span-2">
-                    <button
-                      onClick={() => toggleStatus(product.id, product.is_active)}
-                      className={cn(
-                        "relative w-14 h-8 rounded-full transition-all duration-300 flex items-center px-1 shadow-inner",
-                        product.is_active ? "bg-green-500" : "bg-gray-300 dark:bg-slate-700"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 pointer-events-none",
-                        product.is_active ? "translate-x-6" : "translate-x-0"
-                      )} />
-                    </button>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="col-span-1 flex justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:bg-primary/10 hover:text-primary w-12 h-12 rounded-xl transition-all active:scale-95"
-                      onClick={() => {
-                        setNewProduct({ ...product, category_id: product.category_id, destination: String(product.destination) });
-                        setIsModalOpen(true);
-                      }}
-                    >
-                      <Edit2 size={22} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-12 h-12 rounded-xl transition-all active:scale-95"
-                      onClick={() => confirmDelete(product.id)}
-                    >
-                      <Trash2 size={22} />
-                    </Button>
-                  </div>
-                </div>
+                </Reorder.Item>
               ))}
-            </div>
+            </Reorder.Group>
           )}
         </div>
       </div>

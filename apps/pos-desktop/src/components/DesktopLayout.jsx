@@ -159,7 +159,7 @@ const DesktopLayout = () => {
       {renderShiftModal()}
 
       {/* Layout o'zgarishi: POS bo'lsa grid, boshqa bo'lsa to'liq ekran */}
-      {activePage === 'pos' ? renderContent() : <div className="flex-1 flex overflow-hidden">{renderContent()}</div>}
+      {activePage === 'pos' ? renderContent() : <div className="flex-1 flex flex-col w-full overflow-hidden">{renderContent()}</div>}
     </div>
   );
 };

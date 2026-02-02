@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users, Clock, Receipt, Hash, User, Search, ArrowRight, Calendar
+  Users, Clock, Receipt, Hash, User, Search, ArrowRight, Calendar, AlertCircle
 } from 'lucide-react';
 import { useIpcListener } from '../hooks/useIpcListener';
 import { useGlobal } from '../context/GlobalContext';
@@ -22,6 +22,7 @@ import MenuModal from './MenuModal';
 const TablesGrid = ({ onSelectTable, selectedTableId }) => { // Accepted selectedTableId prop
   const [tables, setTables] = useState([]);
   const [halls, setHalls] = useState([]);
+  const [reservations, setReservations] = useState([]); // New State
   const [activeHallId, setActiveHallId] = useState('all');
   const [loading, setLoading] = useState(true);
   const [showFree, setShowFree] = useState(false);
@@ -34,13 +35,15 @@ const TablesGrid = ({ onSelectTable, selectedTableId }) => { // Accepted selecte
   const loadData = async () => {
     try {
       if (window.electron && window.electron.ipcRenderer) {
-        const [hallsData, tablesData] = await Promise.all([
+        const [hallsData, tablesData, reservationsData] = await Promise.all([
           window.electron.ipcRenderer.invoke('get-halls'),
           window.electron.ipcRenderer.invoke('get-tables'),
+          window.electron.ipcRenderer.invoke('get-reservations'), // Fetch reservations
         ]);
 
         setHalls(hallsData || []);
         setTables(tablesData || []);
+        setReservations(reservationsData || []);
       }
     } catch (error) {
       console.error("Xatolik:", error);
@@ -54,9 +57,13 @@ const TablesGrid = ({ onSelectTable, selectedTableId }) => { // Accepted selecte
   }, []);
 
   useIpcListener('db-change', (event, data) => {
-    if (['tables', 'sales', 'table-items'].includes(data.type)) {
+    if (['tables', 'sales', 'table-items', 'reservations'].includes(data.type)) { // Listen for reservations too
       loadData();
     }
+  });
+
+  useIpcListener('reservation-update', () => { // Listen for explicit reservation updates
+    loadData();
   });
 
   const filteredTables = tables.filter(table => {
@@ -65,10 +72,21 @@ const TablesGrid = ({ onSelectTable, selectedTableId }) => { // Accepted selecte
     return isHallMatch && isActiveStatus;
   });
 
-  // Sort: Occupied first
+  // Sort: Hall Order -> Status -> Name
   const sortedTables = [...filteredTables].sort((a, b) => {
+    // 1. Hall Order
+    const hallAIndex = halls.findIndex(h => h.id === a.hall_id);
+    const hallBIndex = halls.findIndex(h => h.id === b.hall_id);
+    if (hallAIndex !== hallBIndex) return hallAIndex - hallBIndex;
+
+    // 2. Status Priority
     const statusOrder = { 'payment': 0, 'occupied': 1, 'reserved': 2, 'free': 3 };
-    return statusOrder[a.status] - statusOrder[b.status];
+    if (statusOrder[a.status] !== statusOrder[b.status]) {
+      return statusOrder[a.status] - statusOrder[b.status];
+    }
+
+    // 3. Name (Numeric awareness)
+    return a.name.localeCompare(b.name, undefined, { numeric: true });
   });
 
   /* ... Helper functions ... */
@@ -182,11 +200,39 @@ const TablesGrid = ({ onSelectTable, selectedTableId }) => { // Accepted selecte
                 onClick={() => handleTableClick(table)}
                 onDoubleClick={() => handleTableDoubleClick(table)}
                 className={cn(
-                  "flex items-center justify-between p-5 rounded-2xl border transition-all cursor-pointer select-none min-h-[90px]",
+                  "flex items-center justify-between p-5 rounded-2xl border transition-all cursor-pointer select-none min-h-[90px] relative overflow-hidden", // added relative overflow-hidden
                   getStatusColor(table.status, isSelected),
                   isSelected ? "shadow-lg z-10 scale-[1.01] border-primary" : "shadow-sm active:scale-[0.99] border-transparent hover:border-border"
                 )}
               >
+                {/* RESERVATION INDICATOR */}
+                {(() => {
+                  // Find upcoming reservation (next 3 hours)
+                  const now = new Date();
+                  const upcomingRes = reservations.find(r => {
+                    if (r.table_id !== table.id || r.status !== 'active') return false;
+                    const resTime = new Date(r.reservation_time);
+                    const diffMinutes = (resTime - now) / (1000 * 60);
+                    return diffMinutes > -30 && diffMinutes < 180; // From -30m ago (late) to +3 hours
+                  });
+
+                  if (upcomingRes) {
+                    const resTime = new Date(upcomingRes.reservation_time);
+                    const isClose = (resTime - now) / (1000 * 60) < 30; // Less than 30 mins
+
+                    return (
+                      <div className={cn(
+                        "absolute top-0 right-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-bl-xl flex items-center gap-1 z-20",
+                        isClose ? "bg-red-500 text-white animate-pulse" : "bg-purple-500 text-white"
+                      )}>
+                        <Clock size={10} />
+                        {formatTime(upcomingRes.reservation_time)} - {upcomingRes.customer_name}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 <div className="flex items-center gap-5">
                   {/* Table Icon/Number Container */}
                   <div className={cn(
@@ -222,9 +268,10 @@ const TablesGrid = ({ onSelectTable, selectedTableId }) => { // Accepted selecte
                 <div className="flex flex-col items-end gap-1">
                   {getStatusBadge(table.status)}
 
+
                   {table.total_amount > 0 && (
                     <div className={cn("font-black text-2xl tabular-nums mt-1 tracking-tight", isSelected ? "text-white" : "text-primary")}>
-                      {table.total_amount.toLocaleString()} <span className="text-sm font-bold opacity-70">so'm</span>
+                      {(table.total_amount * (1 + (Number(settings?.serviceChargeValue) || 0) / 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm font-bold opacity-70">so'm</span>
                     </div>
                   )}
                   {table.status === 'free' && <span className="text-sm text-muted-foreground opacity-50 font-bold">--</span>}

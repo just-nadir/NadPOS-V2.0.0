@@ -89,6 +89,43 @@ module.exports = {
                 }
             }
 
+            // Check if table exists to prevent FK error
+            let tableExists = db.prepare('SELECT id FROM tables WHERE id = ?').get(tableId);
+
+            // AGAR STOL TOPILMASA: Legacy ID (Eski versiya) tekshiruvi
+            if (!tableExists) {
+                try {
+                    // 1. _map_tables mavjudligini tekshiramiz (Migratsiyadan qolgan)
+                    const mapping = db.prepare('SELECT new_id FROM _map_tables WHERE old_id = ?').get(tableId);
+                    if (mapping && mapping.new_id) {
+                        log.info(`🔄 Legacy ID Mapping: Table ${tableId} -> ${mapping.new_id}`);
+                        tableId = mapping.new_id;
+                        tableExists = { id: tableId };
+                    }
+                } catch (mapErr) { /* Ignore */ }
+
+                // 2. Agar map dan topilmasa, NOMI bo'yicha qidirib ko'ramiz (Heuristic)
+                // Bu yangi baza + eski app holati uchun (masalan "8" deb kelsa -> "Stol 8" ni qidiramiz)
+                if (!tableExists) {
+                    try {
+                        const candidates = [String(tableId), `Stol ${tableId}`, `Table ${tableId}`, `${tableId}-Stol`];
+                        const placeholders = candidates.map(() => '?').join(',');
+                        const match = db.prepare(`SELECT id, name FROM tables WHERE name IN (${placeholders}) LIMIT 1`).get(...candidates);
+
+                        if (match) {
+                            log.info(`🧠 Heuristic Match: Mapped Legacy ID "${tableId}" -> Table "${match.name}" (${match.id})`);
+                            tableId = match.id;
+                            tableExists = { id: match.id };
+                        }
+                    } catch (hErr) { log.warn("Heuristic search failed", hErr); }
+                }
+            }
+
+            if (!tableExists) {
+                log.warn(`⚠️ addBulkItems: Stol topilmadi (ID: ${tableId}). Mobile app ma'lumotlarini yangilash kerak.`);
+                throw new Error("Stol topilmadi. Iltimos, ilovani yangilang (Sinxronizatsiya).");
+            }
+
             const addBulkTransaction = db.transaction((itemsList) => {
                 checkNumber = getOrCreateCheckNumber(tableId);
 
@@ -227,11 +264,8 @@ module.exports = {
             let service = 0;
             const svcValue = Number(settings.serviceChargeValue) || 0;
 
-            if (settings.serviceChargeType === 'percent') {
-                service = (subtotal * svcValue) / 100;
-            } else {
-                service = guestsCount * svcValue;
-            }
+            // Always calculate as percentage
+            service = (subtotal * svcValue) / 100;
 
             const total = subtotal + service;
 

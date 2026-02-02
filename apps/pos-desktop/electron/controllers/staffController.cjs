@@ -36,7 +36,7 @@ module.exports = {
       log.info(`XODIM: ${user.name} (${user.role}) ma'lumotlari o'zgartirildi.`);
     } else {
       // Yangi user qo'shish
-      const allUsers = db.prepare('SELECT pin, salt FROM users').all();
+      const allUsers = db.prepare('SELECT pin, salt FROM users WHERE deleted_at IS NULL').all();
       const isDuplicate = allUsers.some(u => {
         const { hash } = hashPIN(user.pin, u.salt);
         return hash === u.pin;

@@ -496,8 +496,8 @@ module.exports = {
             <div class="double-line"></div>
             
             <div class="flex">
-                <span>Smena ID:</span>
-                <span class="bold"># ${shiftReport.shiftId}</span>
+                <span>Smena:</span>
+                <span class="bold"># ${shiftReport.shiftNumber || shiftReport.shiftId}</span>
             </div>
              <div class="flex">
                 <span>Kassir:</span>

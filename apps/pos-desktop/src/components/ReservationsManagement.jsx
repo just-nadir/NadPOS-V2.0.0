@@ -1,469 +1,310 @@
-import { format, isSameDay, parseISO, addDays, subDays } from 'date-fns';
+import { format, isSameDay, parseISO, addDays, startOfDay } from 'date-fns';
 import { uz } from 'date-fns/locale';
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Phone, User, Users, Plus, Search, Filter, AlertCircle, CheckCircle, XCircle, MoreVertical, LayoutGrid, List as ListIcon, ChevronLeft, ChevronRight, Armchair } from 'lucide-react';
+import {
+    Calendar,
+    Clock,
+    Plus,
+    Search,
+    LayoutGrid,
+    List as ListIcon,
+    ChevronLeft,
+    ChevronRight,
+    Columns,
+    Kanban as KanbanIcon,
+    Filter
+} from 'lucide-react';
 import { Button } from './ui/button';
 import { useGlobal } from '../context/GlobalContext';
-import CreateReservationModal from './CreateReservationModal';
 
-// Badge Component
-const StatusBadge = ({ status }) => {
-    const styles = {
-        active: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-        completed: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-        cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-        pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    };
-
-    const labels = {
-        active: 'Aktiv',
-        completed: 'Yakunlandi',
-        cancelled: 'Bekor qilindi',
-        pending: 'Kutilmoqda'
-    };
-
-    return (
-        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border border-transparent ${styles[status] || styles.active}`}>
-            {labels[status] || status}
-        </span>
-    );
-};
-
-const StatCard = ({ title, value, icon: Icon, color }) => (
-    <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
-        <div>
-            <p className="text-sm text-muted-foreground font-medium">{title}</p>
-            <h3 className="text-2xl font-bold mt-1">{value}</h3>
-        </div>
-        <div className={`p-3 rounded-xl bg-opacity-10 ${color}`}>
-            <Icon size={24} className={color.replace('bg-', 'text-')} />
-        </div>
-    </div>
-);
+// New Components
+import ReservationTimeline from './reservations/ReservationTimeline';
+import ReservationKanban from './reservations/ReservationKanban';
+import ReservationCard from './reservations/ReservationCard';
+import CreateReservationSheet from './reservations/CreateReservationSheet';
 
 const ReservationsManagement = () => {
+    // --- STATE ---
     const { user } = useGlobal();
     const [reservations, setReservations] = useState([]);
-    const [filter, setFilter] = useState('all');
-    const [search, setSearch] = useState('');
+    const [tables, setTables] = useState([]);
+
+    // View State
+    const [viewMode, setViewMode] = useState('grid'); // 'grid', 'timeline', 'kanban'
     const [selectedDate, setSelectedDate] = useState(new Date());
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [viewMode, setViewMode] = useState('grid'); // grid | list
-    const [reservationToDelete, setReservationToDelete] = useState(null);
+    const [search, setSearch] = useState('');
+    const [filter, setFilter] = useState('all'); // 'all', 'active', 'completed', 'cancelled'
 
+    // Modal State
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [editingReservation, setEditingReservation] = useState(null);
+
+    // --- EFFECT: LOAD DATA ---
     useEffect(() => {
-        fetchReservations();
+        fetchData();
 
-        // Real-time updates listener
+        // Listen for updates
         let cleanup = () => { };
         if (window.electron && window.electron.ipcRenderer) {
             cleanup = window.electron.ipcRenderer.on('reservation-update', () => {
-                fetchReservations();
+                fetchData();
             });
         }
+        return () => cleanup();
+    }, [selectedDate]); // Re-fetch when date changes (optional optimization)
 
-        return () => {
-            cleanup();
-        };
-    }, []);
+    const fetchData = async () => {
+        if (window.electron && window.electron.ipcRenderer) {
+            try {
+                // Parallel fetch
+                const [resData, tablesData] = await Promise.all([
+                    window.electron.ipcRenderer.invoke('get-reservations'), // Might need date filter in future
+                    window.electron.ipcRenderer.invoke('get-tables')
+                ]);
 
-    const fetchReservations = async () => {
-        try {
-            if (window.electron && window.electron.ipcRenderer) {
-                const result = await window.electron.ipcRenderer.invoke('get-reservations');
-                if (result && Array.isArray(result)) {
-                    setReservations(result);
-                    return;
-                }
+                if (Array.isArray(resData)) setReservations(resData);
+                if (Array.isArray(tablesData)) setTables(tablesData);
+            } catch (error) {
+                console.error("Failed to fetch data", error);
             }
-            // Mock if offline/browser
+        } else {
+            // Mock Data
             const now = new Date();
             setReservations([
-                { id: 1, customer_name: 'Sardor', customer_phone: '+998901234567', reservation_time: now.toISOString(), guests: 4, table_name: 'Stol 5', status: 'active', note: 'Tug\'ilgan kun' },
-                { id: 2, customer_name: 'Aziz', customer_phone: '+998998887766', reservation_time: addDays(now, 1).toISOString(), guests: 2, table_name: 'VIP 1', status: 'active' },
+                { id: 1, customer_name: 'Sardor', customer_phone: '+998 90 123 45 67', reservation_time: now.toISOString(), guests: 4, table_name: 'Stol 5', table_id: '1', status: 'active', note: 'Tug\'ilgan kun', hall_name: 'Asosiy Zal' },
+                { id: 2, customer_name: 'Aziz', customer_phone: '+998 99 888 77 66', reservation_time: addDays(now, 1).toISOString(), guests: 2, table_name: 'VIP 1', table_id: '3', status: 'pending', hall_name: 'Terrasa' },
             ]);
-        } catch (error) {
-            console.error("Failed to fetch reservations", error);
+            setTables([
+                { id: '1', name: '5', hall_name: 'Asosiy Zal', capacity: 4 },
+                { id: '2', name: '6', hall_name: 'Asosiy Zal', capacity: 4 },
+                { id: '3', name: 'VIP 1', hall_name: 'Terrasa', capacity: 8 },
+            ]);
         }
     };
 
-    const handleCreateReservation = async (newReservation) => {
+    // --- HANDLERS ---
+    const handleSaveReservation = async (data) => {
         try {
             if (window.electron && window.electron.ipcRenderer) {
-                await window.electron.ipcRenderer.invoke('create-reservation', newReservation);
-                fetchReservations(); // Force refresh immediately
+                if (data.id) {
+                    // TODO: Update logic
+                    await window.electron.ipcRenderer.invoke('update-reservation', data);
+                } else {
+                    await window.electron.ipcRenderer.invoke('create-reservation', data);
+                }
+                fetchData();
             } else {
-                setReservations(prev => [newReservation, ...prev]);
+                // Mock save
+                const newRes = { ...data, id: Date.now(), status: 'active', table_name: 'Auto' };
+                setReservations(prev => [newRes, ...prev]);
             }
         } catch (error) {
-            console.error("Failed to save reservation", error);
+            console.error("Save error", error);
+            throw error; // Rethrow for form error handling
         }
     };
 
-    const handleCancelReservation = (id) => {
-        setReservationToDelete(id);
-    };
-
-    const confirmDelete = async () => {
-        if (!reservationToDelete) return;
+    const handleUpdateStatus = async (id, status) => {
         try {
             if (window.electron && window.electron.ipcRenderer) {
-                await window.electron.ipcRenderer.invoke('delete-reservation', reservationToDelete);
-                fetchReservations(); // Force refresh
+                await window.electron.ipcRenderer.invoke('update-reservation-status', { id, status });
+                fetchData();
+            } else {
+                setReservations(prev => prev.map(r => r.id === id ? { ...r, status } : r));
             }
         } catch (error) {
-            console.error("Failed to delete reservation", error);
-        } finally {
-            setReservationToDelete(null);
+            console.error("Update status error", error);
         }
     };
 
-    const handleUpdateStatus = async (id, newStatus) => {
+    const handleDelete = async (id) => {
+        if (!confirm("O'chirilsinmi?")) return;
         try {
             if (window.electron && window.electron.ipcRenderer) {
-                await window.electron.ipcRenderer.invoke('update-reservation-status', { id, status: newStatus });
-                fetchReservations(); // Force refresh immediately
+                await window.electron.ipcRenderer.invoke('delete-reservation', id);
+                fetchData();
+            } else {
+                setReservations(prev => prev.filter(r => r.id !== id));
             }
         } catch (error) {
-            console.error("Failed to update status", error);
+            console.error("Delete error", error);
         }
     };
 
-    // Filter Logic
+    const handleEdit = (res) => {
+        setEditingReservation(res);
+        setIsSheetOpen(true);
+    };
+
+    const openNewSheet = () => {
+        setEditingReservation(null);
+        setIsSheetOpen(true);
+    };
+
+    // --- FILTERING ---
     const filteredReservations = reservations.filter(res => {
-        const matchesFilter = filter === 'all' || res.status === filter;
         const matchesSearch = res.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
             res.customer_phone?.includes(search);
 
-        // Date filtering
-        const resDate = parseISO(res.reservation_time);
-        const matchesDate = isSameDay(resDate, selectedDate);
+        let matchesDate = true;
+        // Kanban viewda sana muhim emas (yoki alohida mantiq bo'lishi mumkin)
+        // Ammo Timeline va Grid uchun sana asosiy filtr
+        if (viewMode !== 'kanban') {
+            matchesDate = isSameDay(parseISO(res.reservation_time), selectedDate);
+        }
 
-        return matchesFilter && matchesSearch && matchesDate;
+        const matchesFilter = filter === 'all' || res.status === filter;
+
+        return matchesSearch && matchesDate && matchesFilter;
     });
 
-    // Stats
-    const stats = {
-        total: reservations.length,
-        active: reservations.filter(r => r.status === 'active').length,
-        today: reservations.filter(r => isSameDay(parseISO(r.reservation_time), new Date())).length
-    };
-
+    // --- RENDER HELPERS ---
     const changeDate = (days) => {
         const newDate = days === 0 ? new Date() : addDays(selectedDate, days);
         setSelectedDate(newDate);
     };
 
     return (
-        <div className="h-full flex flex-col bg-gray-50/50 dark:bg-background text-foreground animate-in fade-in pb-6">
+        <div className="w-full h-full flex flex-col bg-background text-foreground animate-in fade-in duration-300">
+            {/* Header Toolbar */}
+            <div className="bg-background/80 backdrop-blur-md border-b border-border sticky top-0 z-30 px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
 
-            {/* Header Section */}
-            <div className="bg-card border-b border-border px-6 py-4 flex flex-col gap-4">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Bronlar</h1>
-                        <p className="text-muted-foreground text-sm">Stollarni boshqarish va band qilish</p>
-                    </div>
-                    <Button
-                        size="lg"
-                        className="shadow-lg shadow-indigo-500/20 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 transition-all transform hover:scale-[1.02]"
-                        onClick={() => setShowCreateModal(true)}
-                    >
-                        <Plus size={20} />
-                        Yangi Bron
-                    </Button>
-                </div>
-
-                {/* Stats Row */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <StatCard
-                        title="Bugungi Bronlar"
-                        value={stats.today}
-                        icon={Calendar}
-                        color="bg-blue-500 text-blue-600"
-                    />
-                    <StatCard
-                        title="Aktiv (Jami)"
-                        value={stats.active}
-                        icon={CheckCircle}
-                        color="bg-green-500 text-green-600"
-                    />
-                    <StatCard
-                        title="Jami Tarix"
-                        value={stats.total}
-                        icon={Clock}
-                        color="bg-purple-500 text-purple-600"
-                    />
-                </div>
-
-                {/* Filters Bar */}
-                <div className="flex flex-col xl:flex-row gap-4 items-center justify-between mt-2 sticky top-0 z-10 bg-gray-50/95 dark:bg-background/95 backdrop-blur py-2">
-                    {/* Date Navigation - Modernized */}
-                    <div className="flex items-center bg-white dark:bg-zinc-900 border border-border/50 rounded-2xl p-1.5 shadow-sm shadow-indigo-500/5 w-full md:w-auto">
-                        <Button variant="ghost" size="icon" onClick={() => changeDate(-1)} className="h-8 w-8 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 text-muted-foreground">
-                            <ChevronLeft size={18} />
+                {/* Left: Title & Date Nav */}
+                <div className="flex items-center gap-4">
+                    {/* Date Nav */}
+                    <div className="flex items-center bg-muted/50 rounded-xl p-1 border border-border/50">
+                        <Button variant="ghost" size="icon" onClick={() => changeDate(-1)} className="h-8 w-8 rounded-lg">
+                            <ChevronLeft size={16} />
                         </Button>
-                        <div className="flex items-center gap-2 px-4 min-w-[200px] justify-center">
-                            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-1.5 rounded-lg">
-                                <Calendar size={16} className="text-indigo-600 dark:text-indigo-400" />
-                            </div>
-                            <span className="font-semibold text-sm whitespace-nowrap">
-                                {isSameDay(selectedDate, new Date())
-                                    ? "Bugun, " + format(selectedDate, 'd-MMMM', { locale: uz })
-                                    : format(selectedDate, 'd-MMMM, yyyy', { locale: uz })}
+                        <div className="flex flex-col items-center px-3 min-w-[140px]">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                {isSameDay(selectedDate, new Date()) ? 'Bugun' : format(selectedDate, 'EEEE', { locale: uz })}
+                            </span>
+                            <span className="text-sm font-bold text-foreground leading-none">
+                                {format(selectedDate, 'd MMMM', { locale: uz })}
                             </span>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={() => changeDate(1)} className="h-8 w-8 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 text-muted-foreground">
-                            <ChevronRight size={18} />
-                        </Button>
-                        <div className="w-px h-6 bg-border mx-2"></div>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => changeDate(0)}
-                            className={`text-xs font-medium h-8 px-3 rounded-lg ${isSameDay(selectedDate, new Date()) ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20' : 'text-muted-foreground hover:text-foreground'}`}
-                        >
-                            Bugun
+                        <Button variant="ghost" size="icon" onClick={() => changeDate(1)} className="h-8 w-8 rounded-lg">
+                            <ChevronRight size={16} />
                         </Button>
                     </div>
 
-                    <div className="flex flex-1 w-full xl:w-auto gap-3">
-                        <div className="relative flex-1 group">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-indigo-500 transition-colors" />
-                            <input
-                                placeholder="Qidirish (Ism, Telefon)..."
-                                className="pl-10 h-11 w-full rounded-2xl border border-border/50 bg-white dark:bg-zinc-900 px-3 text-sm ring-offset-background transition-all focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none shadow-sm"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
-                        </div>
+                    <div className="h-8 w-px bg-border/60 mx-2 hidden md:block"></div>
 
-                        <div className="flex bg-white dark:bg-zinc-900 rounded-2xl p-1 border border-border/50 shadow-sm overflow-x-auto min-w-fit">
-                            {['all', 'active', 'completed', 'cancelled'].map((f) => (
-                                <button
-                                    key={f}
-                                    onClick={() => setFilter(f)}
-                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${filter === f
-                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-zinc-800'
-                                        }`}
-                                >
-                                    {f === 'all' ? 'Hammasi' : f === 'active' ? 'Aktiv' : f === 'completed' ? 'Yakunlandi' : 'Bekor'}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="flex bg-white dark:bg-zinc-900 rounded-2xl p-1 border border-border/50 shadow-sm hidden md:flex">
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-gray-100 dark:bg-zinc-800 text-foreground' : 'text-muted-foreground hover:bg-gray-50 dark:hover:bg-zinc-800/50'}`}
-                            >
-                                <LayoutGrid size={18} />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('list')}
-                                className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-gray-100 dark:bg-zinc-800 text-foreground' : 'text-muted-foreground hover:bg-gray-50 dark:hover:bg-zinc-800/50'}`}
-                            >
-                                <ListIcon size={18} />
-                            </button>
+                    {/* Quick Stats (Optional) */}
+                    <div className="hidden lg:flex gap-3 text-sm">
+                        <div className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg font-medium border border-blue-100 dark:border-blue-900/30">
+                            {filteredReservations.length} ta bron
                         </div>
                     </div>
+                </div>
+
+
+                {/* Right: Actions & View Switcher */}
+                <div className="flex items-center gap-3">
+                    {/* Search */}
+                    <div className="relative group w-full md:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                        <input
+                            placeholder="Qidirish..."
+                            className="pl-9 h-10 w-full rounded-xl border border-border bg-background hover:bg-muted/30 focus:bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+
+                    {/* View Switcher */}
+                    {/* View Switcher - REMOVED AS REQUESTED (Only Grid view remains) */}
+                    {/* <div className="flex bg-muted/50 rounded-xl p-1 border border-border/50">
+                        {[
+                            { id: 'grid', icon: LayoutGrid },
+                        ].map((mode) => (
+                            <button
+                                key={mode.id}
+                                onClick={() => setViewMode(mode.id)}
+                                className={`p-2 rounded-lg transition-all text-muted-foreground hover:text-foreground ${viewMode === mode.id ? 'bg-background shadow-sm text-primary' : ''}`}
+                            >
+                                <mode.icon size={18} />
+                            </button>
+                        ))}
+                    </div> */}
+
+                    <Button
+                        onClick={openNewSheet}
+                        className="h-10 px-5 bg-gradient-to-r from-indigo-600 to-primary text-white shadow-lg shadow-primary/25 rounded-xl hover:brightness-110 transition-all font-semibold"
+                    >
+                        <Plus size={18} className="mr-2" /> Yangi Bron
+                    </Button>
                 </div>
             </div>
 
-            {/* Content Grid */}
-            <div className="flex-1 overflow-auto px-6 pb-6 pt-2 scrollbar-thin">
-                {filteredReservations.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-in fade-in zoom-in-95 duration-300">
-                        <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-900/20 rounded-3xl flex items-center justify-center mb-6 shadow-inner ring-1 ring-indigo-100 dark:ring-indigo-800">
-                            <Calendar className="w-10 h-10 text-indigo-500" />
-                        </div>
-                        <h3 className="text-xl font-bold text-foreground">
-                            {isSameDay(selectedDate, new Date()) ? "Bugun uchun bronlar yo'q" : "Ushbu sana uchun bronlar topilmadi"}
-                        </h3>
-                        <p className="text-muted-foreground mt-2 max-w-sm">
-                            Yangi mehmonlarni kutib olishga tayyormisiz? Yangi bron qo'shish tugmasini bosing.
-                        </p>
-                        <Button
-                            size="lg"
-                            className="mt-8 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/30 rounded-full px-8"
-                            onClick={() => setShowCreateModal(true)}
-                        >
-                            <Plus size={20} className="mr-2" />
-                            Yangi Bron Qo'shish
-                        </Button>
-                    </div>
-                ) : (
-                    <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5" : "flex flex-col gap-3 max-w-5xl mx-auto"}>
-                        {filteredReservations.map((res, index) => (
-                            <div
-                                key={res.id}
-                                style={{ animationDelay: `${index * 50}ms` }}
-                                className={`group bg-white dark:bg-card border border-border/60 rounded-3xl p-5 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden flex ${viewMode === 'list' ? 'flex-row items-center gap-6' : 'flex-col'}`}
-                            >
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-hidden p-4 relative">
 
-                                <div className="flex justify-between items-start w-full relative z-10">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-md ${res.status === 'active' ? 'bg-gradient-to-br from-orange-400 to-amber-500 shadow-orange-500/20' :
-                                                res.status === 'completed' ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-500/20' :
-                                                    'bg-gradient-to-br from-red-500 to-pink-600 shadow-red-500/20'
-                                            }`}>
-                                            {res.customer_name?.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <h3 className="font-bold text-lg leading-tight text-foreground line-clamp-1">{res.customer_name}</h3>
-                                            <div className="flex items-center gap-1.5 mt-1">
-                                                <p className="text-xs font-medium text-muted-foreground">{res.customer_phone}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {viewMode === 'grid' && (
-                                        <div className="flex flex-col items-end gap-1">
-                                            <div className="text-lg font-bold text-foreground bg-gray-100 dark:bg-zinc-800 px-2.5 py-1 rounded-xl">
-                                                {format(parseISO(res.reservation_time), 'HH:mm')}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {viewMode === 'grid' && <div className="h-px bg-border/50 my-4 w-full"></div>}
-
-                                <div className={`grid ${viewMode === 'list' ? 'grid-cols-4 gap-8 flex-1' : 'grid-cols-2 gap-3'} text-sm relative z-10`}>
-                                    <div className='bg-gray-50 dark:bg-zinc-800/50 p-2.5 rounded-xl border border-gray-100 dark:border-zinc-800'>
-                                        <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider block mb-1">Stol</span>
-                                        <div className="font-bold text-foreground flex items-center gap-1.5">
-                                            {res.table_name ? (
-                                                <>
-                                                    <Armchair size={14} className="text-orange-500" />
-                                                    <span className="truncate">
-                                                        {res.hall_name || 'Zal'} <span className="text-indigo-600 dark:text-indigo-400">{res.table_name}</span>
-                                                    </span>
-                                                </>
-                                            ) : (
-                                                <span className="text-muted-foreground italic font-normal">Tanlanmagan</span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className='bg-gray-50 dark:bg-zinc-800/50 p-2.5 rounded-xl border border-gray-100 dark:border-zinc-800'>
-                                        <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider block mb-1">Mehmonlar</span>
-                                        <div className="flex items-center gap-1.5 font-bold text-foreground">
-                                            <Users size={14} className="text-indigo-500" />
-                                            <span>{res.guests}</span>
-                                        </div>
-                                    </div>
-
-                                    {viewMode === 'list' && (
-                                        <div className='flex items-center gap-4'>
-                                            <div className="flex items-center gap-2 text-foreground font-semibold bg-gray-100 dark:bg-zinc-800 py-1.5 px-3 rounded-lg">
-                                                <Calendar size={16} className="text-indigo-500" />
-                                                {format(parseISO(res.reservation_time), 'HH:mm')}
-                                            </div>
-                                            <StatusBadge status={res.status} />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {viewMode === 'grid' && res.note && (
-                                    <div className="mt-3 text-xs text-muted-foreground bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 p-2.5 rounded-xl flex items-start gap-2 relative z-10">
-                                        <AlertCircle size={14} className="mt-0.5 shrink-0 text-amber-500" />
-                                        <span className="line-clamp-2 font-medium text-amber-900 dark:text-amber-100">{res.note}</span>
-                                    </div>
-                                )}
-
-                                {viewMode === 'grid' && (
-                                    <div className="mt-4 flex gap-2 pt-2 relative z-10">
-                                        {res.status === 'active' ? (
-                                            <Button
-                                                size="sm"
-                                                onClick={() => handleUpdateStatus(res.id, 'completed')}
-                                                className="flex-1 h-9 bg-white dark:bg-zinc-800 hover:bg-green-50 dark:hover:bg-green-900/20 text-green-700 dark:text-green-400 border border-gray-200 dark:border-zinc-700 shadow-sm hover:border-green-200 transition-all text-xs font-semibold rounded-xl">
-                                                <CheckCircle size={14} className="mr-1.5" /> Keldi
-                                            </Button>
-                                        ) : (
-                                            <Button variant="ghost" size="sm" className="flex-1 h-9 rounded-xl text-xs bg-gray-100 dark:bg-zinc-800 text-muted-foreground border border-transparent" disabled>
-                                                {res.status === 'completed' ? 'Yakunlandi' : 'Bekor qilingan'}
-                                            </Button>
-                                        )}
-
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleCancelReservation(res.id)}
-                                            className="text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 h-9 w-9 p-0 rounded-xl transition-colors border border-transparent hover:border-red-100"
-                                            title="Bekor qilish"
-                                        >
-                                            <XCircle size={18} />
-                                        </Button>
-                                    </div>
-                                )}
-
-                                {viewMode === 'list' && (
-                                    <div className="flex gap-2">
-                                        {res.status === 'active' && (
-                                            <Button
-                                                size="sm"
-                                                onClick={() => handleUpdateStatus(res.id, 'completed')}
-                                                className="bg-green-100 hover:bg-green-200 text-green-700 border-none">
-                                                <CheckCircle size={16} className="mr-2" /> Keldi
-                                            </Button>
-                                        )}
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => handleCancelReservation(res.id)}
-                                            className="text-red-500 hover:bg-red-50"
-                                        ><XCircle size={18} /></Button>
-                                    </div>
-                                )}
+                {viewMode === 'grid' && (
+                    <div className="h-full overflow-y-auto custom-scrollbar pb-20">
+                        {filteredReservations.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                                {filteredReservations.map(res => (
+                                    <ReservationCard
+                                        key={res.id}
+                                        reservation={res}
+                                        onUpdateStatus={handleUpdateStatus}
+                                        onDelete={handleDelete}
+                                        onEdit={handleEdit}
+                                    />
+                                ))}
                             </div>
-                        ))}
+                        ) : (
+                            <EmptyState onAdd={openNewSheet} />
+                        )}
                     </div>
+                )}
+
+                {viewMode === 'timeline' && (
+                    <div className="h-full">
+                        <ReservationTimeline
+                            reservations={filteredReservations}
+                            tables={tables}
+                            onSelectReservation={handleEdit}
+                        />
+                    </div>
+                )}
+
+                {viewMode === 'kanban' && (
+                    <ReservationKanban
+                        reservations={filteredReservations} // Use all reservations or filtered by date depending on logic
+                        onUpdateStatus={handleUpdateStatus}
+                        onDelete={handleDelete}
+                        onEdit={handleEdit}
+                    />
                 )}
             </div>
 
-            {showCreateModal && (
-                <CreateReservationModal
-                    onClose={() => setShowCreateModal(false)}
-                    onSave={handleCreateReservation}
-                />
-            )}
-
-            {/* Custom Delete Confirmation Modal */}
-            {reservationToDelete && (
-                <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-zinc-950 rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-100 dark:border-zinc-800 animate-in zoom-in-95 duration-200">
-                        <div className="flex flex-col items-center text-center gap-4">
-                            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-full flex items-center justify-center">
-                                <AlertCircle size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-foreground">Bronni o'chirish</h3>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                    Haqiqatan ham ushbu bronni bekor qilmoqchimisiz? Bu amalni ortga qaytarib bo'lmaydi.
-                                </p>
-                            </div>
-                            <div className="flex gap-3 w-full mt-2">
-                                <Button
-                                    variant="outline"
-                                    className="flex-1 h-11"
-                                    onClick={() => setReservationToDelete(null)}
-                                >
-                                    Bekor qilish
-                                </Button>
-                                <Button
-                                    className="flex-1 h-11 bg-red-600 hover:bg-red-700 text-white"
-                                    onClick={confirmDelete}
-                                >
-                                    O'chirish
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Create/Edit Sheet */}
+            <CreateReservationSheet
+                open={isSheetOpen}
+                onOpenChange={setIsSheetOpen}
+                onSave={handleSaveReservation}
+                editingReservation={editingReservation}
+            />
         </div>
     );
 };
+
+const EmptyState = ({ onAdd }) => (
+    <div className="flex flex-col items-center justify-center h-[50vh] text-center opacity-0 animate-in fade-in duration-500 fill-mode-forwards" style={{ animationDelay: '100ms' }}>
+        <div className="w-24 h-24 bg-muted/30 rounded-full flex items-center justify-center mb-6">
+            <Calendar className="w-10 h-10 text-muted-foreground/50" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground">Bronlar topilmadi</h3>
+        <p className="text-muted-foreground mt-2 max-w-sm mb-8">
+            Ushbu sana uchun bronlar mavjud emas. Yangi mehmon qo'shish uchun tugmani bosing.
+        </p>
+        <Button onClick={onAdd} variant="outline" className="border-dashed border-2">
+            Yangi bron qo'shish
+        </Button>
+    </div>
+);
 
 export default ReservationsManagement;

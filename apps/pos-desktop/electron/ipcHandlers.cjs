@@ -52,6 +52,7 @@ function registerIpcHandlers(ipcMain) {
     ipcMain.handle('get-halls', () => tableController.getHalls());
     ipcMain.handle('add-hall', (e, name) => tableController.addHall(name));
     ipcMain.handle('delete-hall', (e, id) => tableController.deleteHall(id));
+    ipcMain.handle('update-halls-order', (e, halls) => tableController.updateHallsOrder(halls));
 
     ipcMain.handle('get-tables', () => tableController.getTables());
     ipcMain.handle('get-tables-by-hall', (e, id) => tableController.getTablesByHall(id));
@@ -74,10 +75,12 @@ function registerIpcHandlers(ipcMain) {
     ipcMain.handle('add-category', (e, name) => productController.addCategory(name));
     ipcMain.handle('update-category', (e, { id, name }) => productController.updateCategory(id, name));
     ipcMain.handle('delete-category', (e, id) => productController.deleteCategory(id));
+    ipcMain.handle('update-categories-order', (e, categories) => productController.updateCategoriesOrder(categories));
 
     ipcMain.handle('get-products', () => productController.getProducts());
     ipcMain.handle('add-product', (e, product) => productController.addProduct(product));
     ipcMain.handle('update-product', (e, product) => productController.updateProduct(product));
+    ipcMain.handle('update-products-order', (e, products) => productController.updateProductsOrder(products));
     ipcMain.handle('toggle-product-status', (e, { id, status }) => productController.toggleProductStatus(id, status));
     ipcMain.handle('delete-product', (e, id) => productController.deleteProduct(id));
 
@@ -170,6 +173,7 @@ function registerIpcHandlers(ipcMain) {
     ipcMain.handle('delete-user', (e, id) => staffController.deleteUser(id));
 
     ipcMain.handle('printer-test', (e, { printerName, type, port }) => printerService.testPrint(printerName, type, port));
+    ipcMain.handle('get-system-printers', () => printerService.getPrinters()); // Added handler
 
     // Sync
     ipcMain.handle('sync-restore', async () => {
@@ -194,13 +198,24 @@ function registerIpcHandlers(ipcMain) {
     // ==========================================
     ipcMain.handle('get-reservations', () => reservationsController.getReservations());
     ipcMain.handle('create-reservation', (e, data) => reservationsController.createReservation(data));
+    ipcMain.handle('update-reservation', (e, data) => reservationsController.updateReservation(data)); // Added handler
     ipcMain.handle('update-reservation-status', (e, { id, status }) => reservationsController.updateReservationStatus(id, status));
     ipcMain.handle('delete-reservation', (e, id) => reservationsController.deleteReservation(id));
 
     // SYSTEM INFO (QR Code uchun)
-    const ip = require('ip');
+    const os = require('os');
     ipcMain.handle('get-network-ip', () => {
-        return { ip: ip.address(), port: 3000 };
+        const interfaces = os.networkInterfaces();
+        const addresses = [];
+        for (const name of Object.keys(interfaces)) {
+            for (const iface of interfaces[name]) {
+                // Skip internal (i.e. 127.0.0.1) and non-ipv4 addresses
+                if (iface.family === 'IPv4' && !iface.internal) {
+                    addresses.push({ name, ip: iface.address });
+                }
+            }
+        }
+        return { ips: addresses, port: 3000 };
     });
 }
 

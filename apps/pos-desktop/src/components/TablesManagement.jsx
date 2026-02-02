@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Reorder } from 'framer-motion';
 import { Plus, Trash2, Layout, Square, Armchair, X, Edit2, Check, MapPin } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import { cn } from '../utils/cn'; // Assuming cn utility exists from previous edits or standard codebase
@@ -72,6 +73,18 @@ const TablesManagement = () => {
 
   useEffect(() => { loadHalls(); }, []);
   useEffect(() => { loadTables(); }, [activeHall]);
+
+  const handleReorder = async (newOrder) => {
+    setHalls(newOrder);
+    if (window.electron && window.electron.ipcRenderer) {
+      try {
+        await window.electron.ipcRenderer.invoke('update-halls-order', newOrder);
+      } catch (error) {
+        console.error("Failed to save order", error);
+        loadHalls(); // Revert on error
+      }
+    }
+  };
 
   const handleAddHall = async (e) => {
     e.preventDefault();
@@ -155,36 +168,53 @@ const TablesManagement = () => {
           </form>
         )}
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {halls.map(hall => (
-            <div key={hall.id} className="relative group">
-              <div
-                onClick={() => setActiveHall(hall.id)}
-                className={cn(
-                  "w-full px-5 py-4 rounded-2xl font-bold text-lg transition-all cursor-pointer flex items-center justify-between min-h-[64px] shadow-sm select-none active:scale-[0.98]",
-                  activeHall === hall.id
-                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 translate-x-1"
-                    : "bg-background text-muted-foreground hover:bg-secondary hover:text-foreground border border-transparent hover:border-border"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <MapPin size={24} className={activeHall === hall.id ? 'opacity-100' : 'opacity-50'} />
-                  <span className="truncate tracking-wide">{hall.name}</span>
-                </div>
 
-                {/* Delete Button */}
-                {activeHall === hall.id && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); confirmDeleteHall(hall.id); }}
-                    className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors active:scale-90"
-                    title="O'chirish"
+
+        <div className="flex-1 overflow-y-auto p-4 bg-secondary/5 scrollbar-thin">
+          <Reorder.Group axis="y" values={halls} onReorder={handleReorder} className="space-y-3">
+            {halls.map(hall => (
+              <Reorder.Item key={hall.id} value={hall}>
+                <div className="relative group">
+                  <div
+                    onClick={() => setActiveHall(hall.id)}
+                    className={cn(
+                      "w-full px-5 py-4 rounded-2xl font-bold text-lg transition-all cursor-pointer flex items-center justify-between min-h-[64px] shadow-sm select-none active:scale-[0.98]",
+                      activeHall === hall.id
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 translate-x-1"
+                        : "bg-background text-muted-foreground hover:bg-secondary hover:text-foreground border border-transparent hover:border-border"
+                    )}
                   >
-                    <Trash2 size={20} />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+                    <div className="flex items-center gap-3">
+                      {/* Drag Handle Indicator (Optional - dots) */}
+                      <div className="opacity-0 group-hover:opacity-30 cursor-grab active:cursor-grabbing transition-opacity mr-1">
+                        <svg width="6" height="14" viewBox="0 0 6 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2 2C2 2.55228 1.55228 3 1 3C0.447715 3 0 2.55228 0 2C0 1.44772 0.447715 1 1 1C1.55228 1 2 1.44772 2 2Z" />
+                          <path d="M2 7C2 7.55228 1.55228 8 1 8C0.447715 8 0 7.55228 0 7C0 6.44772 0.447715 6 1 6C1.55228 6 2 6.44772 2 7Z" />
+                          <path d="M2 12C2 12.5523 1.55228 13 1 13C0.447715 13 0 12.5523 0 12C0 11.4477 0.447715 11 1 11C1.55228 11 2 11.4477 2 12Z" />
+                          <path d="M6 2C6 2.55228 5.55228 3 5 3C4.44772 3 4 2.55228 4 2C4 1.44772 4.44772 1 5 1C5.55228 1 6 1.44772 6 2Z" />
+                          <path d="M6 7C6 7.55228 5.55228 8 5 8C4.44772 8 4 7.55228 4 7C4 6.44772 4.44772 6 5 6C5.55228 6 6 6.44772 6 7Z" />
+                          <path d="M6 12C6 12.5523 5.55228 13 5 13C4.44772 13 4 12.5523 4 12C4 11.4477 4.44772 11 5 11C5.55228 11 6 11.4477 6 12Z" />
+                        </svg>
+                      </div>
+                      <MapPin size={24} className={activeHall === hall.id ? 'opacity-100' : 'opacity-50'} />
+                      <span className="truncate tracking-wide">{hall.name}</span>
+                    </div>
+
+                    {/* Delete Button */}
+                    {activeHall === hall.id && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); confirmDeleteHall(hall.id); }}
+                        className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors active:scale-90"
+                        title="O'chirish"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </Reorder.Item>
+            ))}
+          </Reorder.Group>
         </div>
       </div>
 

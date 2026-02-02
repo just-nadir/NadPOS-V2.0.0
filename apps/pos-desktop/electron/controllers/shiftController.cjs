@@ -15,10 +15,15 @@ module.exports = {
 
             const startTime = new Date().toISOString();
             const id = crypto.randomUUID();
-            const stmt = db.prepare("INSERT INTO shifts (id, start_time, start_cash, status, cashier_name) VALUES (?, ?, ?, 'open', ?)");
-            const info = stmt.run(id, startTime, startCash || 0, cashierName);
 
-            log.info(`Smena ochildi: ID ${id}, Kassir: ${cashierName}`);
+            // Smena tartib raqamini aniqlash
+            const lastShift = db.prepare("SELECT MAX(shift_number) as maxNum FROM shifts").get();
+            const nextShiftNum = (lastShift && lastShift.maxNum) ? lastShift.maxNum + 1 : 1;
+
+            const stmt = db.prepare("INSERT INTO shifts (id, start_time, start_cash, status, cashier_name, shift_number) VALUES (?, ?, ?, 'open', ?, ?)");
+            const info = stmt.run(id, startTime, startCash || 0, cashierName, nextShiftNum);
+
+            log.info(`Smena ochildi: ID ${id}, №${nextShiftNum}, Kassir: ${cashierName}`);
             notify('shift-status', 'open');
             return { success: true, shiftId: id };
         } catch (err) {
@@ -125,6 +130,7 @@ module.exports = {
                     // 1. Print Financial Z-Report
                     await printerService.printZReport({
                         shiftId: shiftId,
+                        shiftNumber: activeShift.shift_number, // YANGI: Tartib raqami
                         startTime: activeShift.start_time,
                         endTime: endTime,
                         cashierName: activeShift.cashier_name,

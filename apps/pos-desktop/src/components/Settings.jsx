@@ -1,14 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Printer, Database, Store, Receipt, Percent, RefreshCw, ChefHat, Plus, Trash2, Users, Shield, Key, Coins, CheckCircle, PcCase, MessageSquare, Send, FileText, History, Settings as SettingsIcon, Smartphone } from 'lucide-react';
+import {
+  Save, Printer, Database, Store, Receipt, Percent, RefreshCw, ChefHat,
+  ShoppingBag, Trash2, ArrowUpRight, ArrowDownRight, Clock,
+  ChevronLeft, Search, Plus, PcCase, Edit2, Check, X, QrCode, Monitor, Send,
+  RotateCcw, ShieldCheck, UserCog, Users, Shield, Key, Coins, CheckCircle,
+  MessageSquare, FileText, History, Settings as SettingsIcon, Smartphone
+} from 'lucide-react';
 import QRCode from "react-qr-code";
 import ConfirmModal from './ConfirmModal';
 import UpdateSettings from './settings/UpdateSettings';
 import { formatDate } from '../utils/dateUtils';
 import { cn } from '../utils/cn';
-
+import { useGlobal } from '../context/GlobalContext'; // Restore useGlobal
 
 const MobileAppSettings = () => {
-  const [networkInfo, setNetworkInfo] = useState({ ip: 'Ishelayapti...', port: 3000 });
+  const [networkInfo, setNetworkInfo] = useState({ ips: [], port: 3000 });
+  const [selectedIp, setSelectedIp] = useState('');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -16,20 +23,27 @@ const MobileAppSettings = () => {
       window.electron.ipcRenderer.invoke('get-network-ip')
         .then(info => {
           setNetworkInfo(info);
+          if (info.ips && info.ips.length > 0) {
+            setSelectedIp(info.ips[0].ip);
+          }
         })
         .catch(err => {
           console.error("IP Error:", err);
-          setNetworkInfo({ ip: 'localhost', port: 3000 });
+          setNetworkInfo({ ips: [], port: 3000 });
         });
     }
   }, []);
 
-  const url = `http://${networkInfo.ip}:${networkInfo.port}`;
+  const url = `http://${selectedIp || 'localhost'}:${networkInfo.port}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleIpChange = (e) => {
+    setSelectedIp(e.target.value);
   };
 
   return (
@@ -48,7 +62,7 @@ const MobileAppSettings = () => {
         <div className="max-w-md mx-auto bg-secondary/20 p-6 rounded-2xl border border-border">
           <label className="block text-sm font-bold text-muted-foreground mb-2 uppercase tracking-wide">Ulanish Manzili</label>
           <div className="flex items-center gap-3">
-            <code className="flex-1 bg-background h-14 rounded-xl border border-border flex items-center justify-center font-mono text-xl font-bold text-foreground shadow-inner">
+            <code className="flex-1 bg-background h-14 rounded-xl border border-border flex items-center justify-center font-mono text-xl font-bold text-foreground shadow-inner px-4 overflow-hidden">
               {url}
             </code>
             <button
@@ -62,6 +76,24 @@ const MobileAppSettings = () => {
             </button>
           </div>
         </div>
+
+        {networkInfo.ips && networkInfo.ips.length > 1 && (
+          <div className="max-w-md mx-auto mt-4 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-xl border border-yellow-100 dark:border-yellow-800 text-left">
+            <label className="block text-sm font-bold text-yellow-700 dark:text-yellow-400 mb-2">Ulanish tarmog'ini tanlang (IP)</label>
+            <select
+              value={selectedIp}
+              onChange={handleIpChange}
+              className="w-full h-12 px-4 rounded-lg border border-yellow-200 dark:border-yellow-800 bg-white dark:bg-black font-mono text-lg outline-none focus:ring-2 focus:ring-yellow-500/50"
+            >
+              {networkInfo.ips.map((item, idx) => (
+                <option key={idx} value={item.ip}>{item.name}: {item.ip}</option>
+              ))}
+            </select>
+            <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-2">
+              Agar QR kod ishlamasa, ro'yxatdan boshqa tarmoqni (masalan WiFi) tanlab ko'ring.
+            </p>
+          </div>
+        )}
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
@@ -83,14 +115,20 @@ const MobileAppSettings = () => {
 };
 
 const Settings = () => {
-  const [activeTab, setActiveTab] = useState('general'); // Tabs: general, users, printer_settings
+  const { updateSettings, showToast } = useGlobal(); // Use global context
+  const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(false);
   const [kitchens, setKitchens] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [notification, setNotification] = useState(null);
   const [systemPrinters, setSystemPrinters] = useState([]);
+  const [editingKitchen, setEditingKitchen] = useState(null); // Add editing state
+  const [users, setUsers] = useState([]);
 
-
+  // Note: systemPrinters is likely from useGlobal, so local state might not be needed if it's already provided.
+  // But if the component logic relies on local fetching, we might need to adjust.
+  // Based on previous code, systemPrinters was coming from useGlobal.
+  // We should remove local systemPrinters state if it conflicts, but let's stick to what was likely intended.
+  // actually in previous view (line 95 in view), there was [systemPrinters, setSystemPrinters] = useState([]).
+  // This conflicts with useGlobal destructuring. I will remove the local state and use the one from context if available.
 
   const [newKitchen, setNewKitchen] = useState({ name: '', printer_ip: '' });
   const [newUser, setNewUser] = useState({ name: '', pin: '', role: 'waiter', permissions: ['pos', 'tables'] });
@@ -119,14 +157,7 @@ const Settings = () => {
     loadAllData();
   }, []);
 
-  useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => setNotification(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
 
-  const showNotify = (type, msg) => setNotification({ type, msg });
 
 
 
@@ -171,7 +202,7 @@ const Settings = () => {
         printerReceiptType: 'driver'
       };
       await window.electron.ipcRenderer.invoke('save-settings', settingsToSave);
-      showNotify('success', "Sozlamalar saqlandi!");
+      showToast('success', "Sozlamalar saqlandi!");
     } catch (err) { console.error(err); }
     setLoading(false);
   };
@@ -188,7 +219,7 @@ const Settings = () => {
       await window.electron.ipcRenderer.invoke('save-kitchen', kitchenToSave);
       setNewKitchen({ name: '', printer_ip: '' });
       loadAllData();
-      showNotify('success', "Oshxona qo'shildi");
+      showToast('success', "Oshxona qo'shildi");
     } catch (err) { console.error(err); }
   };
 
@@ -197,14 +228,27 @@ const Settings = () => {
       const { ipcRenderer } = window.electron;
       if (modal.type === 'kitchen') {
         await ipcRenderer.invoke('delete-kitchen', modal.id);
-        showNotify('success', "O'chirildi");
+        showToast('success', "O'chirildi");
       } else if (modal.type === 'user') {
         await ipcRenderer.invoke('delete-user', modal.id);
-        showNotify('success', "O'chirildi");
+        showToast('success', "O'chirildi");
       }
       loadAllData();
     } catch (err) {
-      showNotify('error', err.message);
+      showToast('error', err.message);
+    }
+  };
+
+  const confirmEditKitchen = async () => {
+    if (!editingKitchen || !editingKitchen.name) return;
+    try {
+      await window.electron.ipcRenderer.invoke('save-kitchen', editingKitchen);
+      showToast('success', "Oshxona yangilandi");
+      setEditingKitchen(null);
+      loadAllData();
+    } catch (error) {
+      console.error(error);
+      showToast('error', "Xatolik yuz berdi");
     }
   };
 
@@ -223,9 +267,9 @@ const Settings = () => {
       await window.electron.ipcRenderer.invoke('save-user', newUser);
       setNewUser({ name: '', pin: '', role: 'waiter', permissions: ['pos', 'tables'] });
       loadAllData();
-      showNotify('success', "Xodim saqlandi!");
+      showToast('success', "Xodim saqlandi!");
     } catch (err) {
-      showNotify('error', err.message);
+      showToast('error', err.message);
     }
   };
 
@@ -254,15 +298,7 @@ const Settings = () => {
 
   return (
     <div className="flex w-full h-full bg-background relative selection:bg-primary/20">
-      {notification && (
-        <div className={cn(
-          "absolute top-6 right-6 z-50 px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 text-white font-bold text-lg animate-in slide-in-from-top duration-300",
-          notification.type === 'success' ? 'bg-green-600 dark:bg-green-500' : 'bg-red-600 dark:bg-red-500'
-        )}>
-          {notification.type === 'success' ? <CheckCircle size={28} /> : <Shield size={28} />}
-          {notification.msg}
-        </div>
-      )}
+
 
       <div className="w-80 bg-card border-r border-border flex flex-col h-full p-6 shadow-sm z-10 transition-colors">
         <h2 className="text-2xl font-black text-foreground mb-8 px-2 flex items-center gap-3">
@@ -303,6 +339,7 @@ const Settings = () => {
                   <input type="number" name="serviceChargeValue" value={settings.serviceChargeValue || 0} onChange={handleChange} className="w-full h-16 pl-6 pr-12 bg-secondary/20 rounded-xl border border-border outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-black text-3xl text-foreground transition-all" />
                   <div className="absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground font-black text-xl">%</div>
                 </div>
+                <p className="mt-2 text-sm text-muted-foreground">Faqat foizda hisoblanadi.</p>
               </div>
             </div>
 
@@ -317,7 +354,7 @@ const Settings = () => {
                   <label className="block text-sm font-bold text-muted-foreground mb-2 uppercase tracking-wide">QR Link (Instagram/Telegram)</label>
                   <div className="relative">
                     <Send size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <input type="text" name="qr_link" value={settings.qr_link || ''} onChange={handleChange} placeholder="https://instagram.com/nadpos" className="w-full h-14 pl-12 pr-4 bg-secondary/20 rounded-xl border border-border outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-bold text-lg text-foreground transition-all" />
+                    <input type="text" name="qr_link" value={settings.qr_link || ''} onChange={handleChange} placeholder="https://instagram.com/nadpos.uz" className="w-full h-14 pl-12 pr-4 bg-secondary/20 rounded-xl border border-border outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-bold text-lg text-foreground transition-all" />
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground italic">Chekning pastki qismida chiqadigan QR kod uchun havola.</p>
                 </div>
@@ -347,12 +384,12 @@ const Settings = () => {
                     try {
                       const res = await window.electron.ipcRenderer.invoke('sync-restore');
                       if (res.success) {
-                        showNotify('success', "Ma'lumotlar muvaffaqiyatli tiklandi!");
+                        showToast('success', "Ma'lumotlar muvaffaqiyatli tiklandi!");
                       } else {
-                        showNotify('error', "Xatolik: " + res.message);
+                        showToast('error', "Xatolik: " + res.message);
                       }
                     } catch (e) {
-                      showNotify('error', "Tizim xatoligi shim.");
+                      showToast('error', "Tizim xatoligi shim.");
                     } finally {
                       setLoading(false);
                     }
@@ -462,7 +499,7 @@ const Settings = () => {
                   className="w-full h-14 px-4 rounded-xl border border-border bg-background outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 text-lg font-medium text-foreground transition-all"
                 >
                   <option value="">Printerni tanlang...</option>
-                  {systemPrinters.map(p => (
+                  {(systemPrinters || []).map(p => (
                     <option key={p.name} value={p.name}>{p.name}</option>
                   ))}
                 </select>
@@ -472,7 +509,7 @@ const Settings = () => {
             {/* Oshxonalar Section */}
             <div className="bg-card p-8 rounded-3xl shadow-sm border border-border">
               <h3 className="text-2xl font-bold text-foreground mb-4 flex items-center gap-3"><Plus size={28} className="text-blue-500" /> Yangi Oshxona Qo'shish</h3>
-              <p className="text-sm text-muted-foreground mb-6">Oshxona printerini tanlang (Faqat Driver orqali ulanadi)</p>
+              <p className="text-sm text-muted-foreground mb-6">Oshxona printerini tanlang</p>
 
               <form onSubmit={handleSaveKitchen} className="space-y-6">
                 <div className="grid grid-cols-12 gap-6 items-end">
@@ -485,7 +522,7 @@ const Settings = () => {
                     <label className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wide">Printer Tanlash</label>
                     <select value={newKitchen.printer_ip} onChange={e => setNewKitchen({ ...newKitchen, printer_ip: e.target.value })} className="w-full h-14 px-4 rounded-xl border border-border bg-secondary/20 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 font-medium text-lg text-foreground transition-all">
                       <option value="">Tanlanmagan</option>
-                      {systemPrinters.map(p => (
+                      {(systemPrinters || []).map(p => (
                         <option key={p.name} value={p.name}>{p.name} ({p.displayName || p.name})</option>
                       ))}
                     </select>
@@ -503,13 +540,45 @@ const Settings = () => {
               <div className="space-y-4">
                 {kitchens.map(k => (
                   <div key={k.id} className="flex items-center justify-between p-5 bg-secondary/10 hover:bg-secondary/20 rounded-2xl border border-border group transition-colors">
-                    <div>
-                      <p className="font-bold text-foreground text-xl">{k.name}</p>
-                      <div className="text-sm text-muted-foreground font-medium flex items-center gap-2 mt-1">
-                        <PcCase size={16} className="text-blue-500" /> Printer: <span className="font-mono bg-background px-2 py-0.5 rounded border border-border">{k.printer_ip || 'Tanlanmagan'}</span>
+                    {editingKitchen?.id === k.id ? (
+                      <div className="flex-1 flex items-center gap-4 animate-in fade-in zoom-in-95">
+                        <input
+                          type="text"
+                          value={editingKitchen.name}
+                          onChange={(e) => setEditingKitchen({ ...editingKitchen, name: e.target.value })}
+                          className="flex-1 h-10 px-3 rounded-lg border border-border bg-background"
+                          placeholder="Oshxona nomi"
+                          autoFocus
+                        />
+                        <select
+                          value={editingKitchen.printer_ip}
+                          onChange={(e) => setEditingKitchen({ ...editingKitchen, printer_ip: e.target.value })}
+                          className="h-10 px-3 rounded-lg border border-border bg-background w-48"
+                        >
+                          <option value="">Printer Tanlanmagan</option>
+                          {(systemPrinters || []).map(p => (
+                            <option key={p.name} value={p.name}>{p.name}</option>
+                          ))}
+                        </select>
+                        <div className="flex gap-2">
+                          <button onClick={() => confirmEditKitchen()} className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"><Check size={20} /></button>
+                          <button onClick={() => setEditingKitchen(null)} className="p-2 bg-secondary text-muted-foreground rounded-lg hover:bg-secondary/80 transition-colors"><X size={20} /></button>
+                        </div>
                       </div>
-                    </div>
-                    <button onClick={() => confirmDeleteKitchen(k.id)} className="p-3 text-muted-foreground hover:text-white hover:bg-destructive rounded-xl transition-all active:scale-90"><Trash2 size={24} /></button>
+                    ) : (
+                      <>
+                        <div>
+                          <p className="font-bold text-foreground text-xl">{k.name}</p>
+                          <div className="text-sm text-muted-foreground font-medium flex items-center gap-2 mt-1">
+                            <PcCase size={16} className="text-blue-500" /> Printer: <span className="font-mono bg-background px-2 py-0.5 rounded border border-border">{k.printer_ip || 'Tanlanmagan'}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => setEditingKitchen(k)} className="p-3 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 rounded-xl transition-all active:scale-90"><Edit2 size={24} /></button>
+                          <button onClick={() => confirmDeleteKitchen(k.id)} className="p-3 text-muted-foreground hover:text-white hover:bg-destructive rounded-xl transition-all active:scale-90"><Trash2 size={24} /></button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
                 {kitchens.length === 0 && (

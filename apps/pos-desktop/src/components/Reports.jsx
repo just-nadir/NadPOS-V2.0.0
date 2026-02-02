@@ -488,7 +488,10 @@ const Reports = () => {
         )
       },
       { label: "Cheklar", key: "count", className: "text-center", headerAlign: "justify-center", cellClassName: "text-center text-muted-foreground font-medium", render: (w) => `${w.count} ta` },
-      settings.serviceChargeType === 'fixed' ? { label: "Mehmonlar", key: "guests", className: "text-center", headerAlign: "justify-center", cellClassName: "text-center font-bold text-primary", render: (w) => `${w.guests} kishi` } : null,
+      // settings.serviceChargeType === 'fixed' check removed, so we hide guests column as it was hidden for 'percent' before.
+      // If we want to show it always, we could, but let's stick to removal to match 'percent' behavior.
+      // Actually, let's just remove the line.
+
       { label: "Xizmat Haqi", key: "service", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-medium text-orange-500", render: (w) => Math.round(w.service).toLocaleString() },
       { label: "Jami Savdo", key: "revenue", className: "text-right", headerAlign: "justify-end", cellClassName: "text-right font-bold text-foreground", render: (w) => w.revenue.toLocaleString() }
     ].filter(Boolean);
@@ -614,6 +617,14 @@ const Reports = () => {
 
   const renderShifts = () => {
     const columns = [
+      {
+        label: "#",
+        key: "shift_number",
+        className: "w-16 text-center",
+        headerAlign: "justify-center",
+        cellClassName: "font-mono font-bold text-center text-muted-foreground",
+        render: (s) => `#${s.shift_number || '?'}`
+      },
       {
         label: "Kassir",
         key: "cashier_name",
@@ -776,7 +787,7 @@ const Reports = () => {
               <ChevronLeft size={16} /> Ortga
             </Button>
             <div>
-              <h3 className="text-lg font-bold">Smena Tafsilotlari</h3>
+              <h3 className="text-lg font-bold">Smena Tafsilotlari <span className="text-muted-foreground ml-2">#{selectedShift.shift_number || selectedShift.id.substring(0, 6)}</span></h3>
               <p className="text-sm text-muted-foreground">
                 Kassir: {selectedShift.cashier_name} | {formatDateTime(selectedShift.start_time)}
               </p>

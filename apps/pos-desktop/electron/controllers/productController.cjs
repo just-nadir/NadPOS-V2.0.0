@@ -2,11 +2,29 @@ const { db, notify, addToSyncQueue } = require('../database.cjs');
 const crypto = require('crypto');
 
 module.exports = {
-    getCategories: () => db.prepare('SELECT * FROM categories WHERE deleted_at IS NULL').all(),
+    getCategories: () => db.prepare('SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC').all(),
+
+    updateCategoriesOrder: (categories) => {
+        const updateStmt = db.prepare('UPDATE categories SET sort_order = ?, is_synced = 0 WHERE id = ?');
+        const transaction = db.transaction((items) => {
+            items.forEach((cat, index) => {
+                updateStmt.run(index, cat.id);
+                addToSyncQueue('categories', cat.id, 'UPDATE', { sort_order: index });
+            });
+        });
+        transaction(categories);
+        notify('categories', null);
+        return { success: true };
+    },
 
     addCategory: (name) => {
         const id = crypto.randomUUID();
-        const res = db.prepare('INSERT INTO categories (id, name) VALUES (?, ?)').run(id, name);
+        // Get max sort_order
+        const maxOrder = db.prepare("SELECT MAX(sort_order) as maxVal FROM categories WHERE deleted_at IS NULL").get();
+        const nextOrder = (maxOrder && maxOrder.maxVal !== null) ? maxOrder.maxVal + 1 : 0;
+
+        const res = db.prepare('INSERT INTO categories (id, name, sort_order) VALUES (?, ?, ?)').run(id, name, nextOrder);
+        addToSyncQueue('categories', id, 'INSERT', { id, name, sort_order: nextOrder });
         notify('products', null);
         notify('categories', null);
         return res;
@@ -37,14 +55,32 @@ module.exports = {
     LEFT JOIN categories c ON p.category_id = c.id 
     LEFT JOIN kitchens k ON p.destination = CAST(k.id AS TEXT)
     WHERE p.deleted_at IS NULL
+    ORDER BY p.sort_order ASC, p.name ASC
   `).all(),
+
+    updateProductsOrder: (products) => {
+        const updateStmt = db.prepare('UPDATE products SET sort_order = ?, is_synced = 0 WHERE id = ?');
+        const transaction = db.transaction((items) => {
+            items.forEach((prod, index) => {
+                updateStmt.run(index, prod.id);
+                addToSyncQueue('products', prod.id, 'UPDATE', { sort_order: index });
+            });
+        });
+        transaction(products);
+        notify('products', null);
+        return { success: true };
+    },
 
     addProduct: (p) => {
         const id = crypto.randomUUID();
-        const res = db.prepare('INSERT INTO products (id, category_id, name, price, destination, unit_type, track_stock, is_active, is_synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)').run(
-            id, p.category_id, p.name, p.price, String(p.destination), p.unit_type || 'item', (p.track_stock !== undefined ? p.track_stock : 1), 1
+        // Get max sort_order within category
+        const maxOrder = db.prepare("SELECT MAX(sort_order) as maxVal FROM products WHERE category_id = ? AND deleted_at IS NULL").get(p.category_id);
+        const nextOrder = (maxOrder && maxOrder.maxVal !== null) ? maxOrder.maxVal + 1 : 0;
+
+        const res = db.prepare('INSERT INTO products (id, category_id, name, price, destination, unit_type, track_stock, is_active, sort_order, is_synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)').run(
+            id, p.category_id, p.name, p.price, String(p.destination), p.unit_type || 'item', (p.track_stock !== undefined ? p.track_stock : 1), 1, nextOrder
         );
-        addToSyncQueue('products', id, 'INSERT', { ...p, id });
+        addToSyncQueue('products', id, 'INSERT', { ...p, id, sort_order: nextOrder });
         notify('products', null);
         return res;
     },

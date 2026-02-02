@@ -62,8 +62,14 @@ function createV2Tables() {
     db.prepare(`CREATE TABLE IF NOT EXISTS halls (
         id TEXT PRIMARY KEY, 
         name TEXT NOT NULL,
-        server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP, deleted_at TEXT
+        server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP, deleted_at TEXT,
+        sort_order INTEGER DEFAULT 0
     )`).run();
+
+    // Hotfix: Add sort_order to halls if missing
+    try {
+        db.prepare("ALTER TABLE halls ADD COLUMN sort_order INTEGER DEFAULT 0").run();
+    } catch (e) { /* Column likely exists */ }
 
     db.prepare(`CREATE TABLE IF NOT EXISTS tables (
         id TEXT PRIMARY KEY,
@@ -84,8 +90,14 @@ function createV2Tables() {
     db.prepare(`CREATE TABLE IF NOT EXISTS categories (
         id TEXT PRIMARY KEY, 
         name TEXT NOT NULL,
-        server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP, deleted_at TEXT
+        server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP, deleted_at TEXT,
+        sort_order INTEGER DEFAULT 0
     )`).run();
+
+    // Hotfix: Add sort_order to categories if missing
+    try {
+        db.prepare("ALTER TABLE categories ADD COLUMN sort_order INTEGER DEFAULT 0").run();
+    } catch (e) { /* Column likely exists */ }
 
     db.prepare(`CREATE TABLE IF NOT EXISTS products (
         id TEXT PRIMARY KEY,
@@ -98,8 +110,14 @@ function createV2Tables() {
         stock REAL DEFAULT 0, -- YANGI: Qoldiq
         track_stock INTEGER DEFAULT 1, -- YANGI: Ombor hisobi (1=Ha, 0=Yo'q)
         server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP, deleted_at TEXT,
+        sort_order INTEGER DEFAULT 0,
         FOREIGN KEY(category_id) REFERENCES categories(id)
     )`).run();
+
+    // Hotfix: Add sort_order to products if missing
+    try {
+        db.prepare("ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 0").run();
+    } catch (e) { /* Column likely exists */ }
 
     // Hotfix: Add unit_type and stock if missing (for existing V2 DBs)
     try {
@@ -336,8 +354,35 @@ function createV2Tables() {
         total_cash REAL DEFAULT 0,
         total_card REAL DEFAULT 0,
         total_transfer REAL DEFAULT 0,
-        server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        server_id TEXT, restaurant_id TEXT, is_synced INTEGER DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        shift_number INTEGER
     )`).run();
+
+    // Hotfix: Add shift_number if missing
+    try {
+        db.prepare("ALTER TABLE shifts ADD COLUMN shift_number INTEGER").run();
+    } catch (e) { /* Column likely exists */ }
+
+    // Backfill shift_number for existing shifts
+    try {
+        const nullShifts = db.prepare("SELECT COUNT(*) as count FROM shifts WHERE shift_number IS NULL").get();
+        if (nullShifts.count > 0) {
+            console.log("🔄 Backfilling shift_number for existing shifts...");
+            const allShifts = db.prepare("SELECT id FROM shifts ORDER BY start_time ASC").all();
+            const updateStmt = db.prepare("UPDATE shifts SET shift_number = ? WHERE id = ?");
+
+            const transaction = db.transaction((shifts) => {
+                shifts.forEach((shift, index) => {
+                    updateStmt.run(index + 1, shift.id);
+                });
+            });
+
+            transaction(allShifts);
+            console.log("✅ Shift numbers backfilled.");
+        }
+    } catch (e) {
+        console.error("Error backfilling shift numbers:", e);
+    }
 
     // 2.3 Bronlar (Reservations)
     db.prepare(`CREATE TABLE IF NOT EXISTS reservations (
@@ -713,6 +758,7 @@ function initDB() {
         } else {
             console.log("✅ DB is up to date (V2). Verifying tables...");
             createV2Tables(); // Idempotent check
+            seedTables(); // Check and seed tables if empty
         }
 
         // --- Foreign Keys Enable (After migration) ---
@@ -768,10 +814,25 @@ function seedDefaults() {
         db.prepare(`INSERT INTO settings(key, value, updated_at, is_synced) VALUES('next_check_number', '1', ?, 0)`).run(OLD_DATE);
     }
 
-    // Default Kitchens seeding removed
-    // Default SMS Templates seeding removed
-    // Default SMS Templates seeding removed
-    // Default SMS Templates seeding removed
+    seedTables();
+}
+
+function seedTables() {
+    const tableCount = db.prepare('SELECT count(*) as count FROM tables').get().count;
+    if (tableCount === 0) {
+        console.log("⚠️ No tables found. Seeding demo tables...");
+        const hallId = uuidv4();
+        // Create Hall
+        db.prepare("INSERT INTO halls (id, name, restaurant_id, is_synced) VALUES (?, ?, ?, 0)").run(hallId, 'Asosiy Zal', RESTAURANT_ID);
+
+        // Create Tables
+        for (let i = 1; i <= 5; i++) {
+            const tableId = uuidv4();
+            db.prepare("INSERT INTO tables (id, hall_id, name, guests, status, restaurant_id, is_synced) VALUES (?, ?, ?, ?, 'free', ?, 0)")
+                .run(tableId, hallId, `Stol ${i}`, 4, RESTAURANT_ID);
+        }
+        console.log("✅ Demo tables created: 'Asosiy Zal' with 5 tables.");
+    }
 }
 
 // --- SYNC HELPER ---

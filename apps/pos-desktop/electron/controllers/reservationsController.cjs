@@ -1,4 +1,4 @@
-const { db, uuidv4, notify, RESTAURANT_ID } = require('../database.cjs');
+const { db, uuidv4, notify, getRestaurantId } = require('../database.cjs');
 
 const RESERVATION_DURATION_MINUTES = 120; // Default 2 soat
 
@@ -23,6 +23,7 @@ const reservationsController = {
 
     createReservation: (data) => {
         try {
+            console.log('createReservation called with:', data);
             const { customer_name, customer_phone, reservation_time, guests, table_id, note } = data;
 
             // 1. Vaqtga tekshiruv (O'tmishga bron qilmaslik)
@@ -48,14 +49,19 @@ const reservationsController = {
                 // Avtomatik -> Bo'sh stol qidiramiz
                 finalTableId = findBestAvailableTable(guests, reservation_time);
                 if (!finalTableId) {
-                    throw new Error("Afsuski, mos keluvchi bo'sh stol topilmadi");
+                    // Agar stol topilmasa, stolsiz qabul qilamiz (Pending)
+                    console.warn("Avtomatik stol topilmadi, stolsiz saqlanmoqda.");
+                    // throw new Error("Afsuski, mos keluvchi bo'sh stol topilmadi"); // Oldingi qattiq cheklov
                 }
             }
+
+            const restaurantId = getRestaurantId();
+            console.log('Inserting reservation:', { id, customer_name, finalTableId, restaurantId });
 
             db.prepare(`
                 INSERT INTO reservations (id, customer_name, customer_phone, reservation_time, guests, table_id, note, status, created_at, updated_at, restaurant_id, is_synced)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, 0)
-            `).run(id, customer_name, customer_phone, reservation_time, guests, finalTableId, note, created_at, created_at, RESTAURANT_ID);
+            `).run(id, customer_name, customer_phone, reservation_time, guests, finalTableId, note, created_at, created_at, restaurantId);
 
             // Notify clients
             notify('reservation-update', id);
@@ -63,6 +69,51 @@ const reservationsController = {
             return { success: true, id, table_id: finalTableId };
         } catch (error) {
             console.error('createReservation error:', error);
+            throw error;
+        }
+    },
+
+    updateReservation: (data) => {
+        try {
+            console.log('updateReservation called with:', data);
+            const { id, customer_name, customer_phone, reservation_time, guests, table_id, note } = data;
+
+            // 1. Vaqtni tekshirish
+            const checkTime = new Date(reservation_time);
+            const now = new Date();
+            if (checkTime < new Date(now.getTime() - 5 * 60 * 1000)) {
+                // throw new Error("O'tgan vaqtga o'zgartirish mumkin emas"); // Tahrirlashda yumshoqroq bo'lishi mumkin, lekin hozircha qoldiramiz
+            }
+
+            const updated_at = new Date().toISOString();
+            let finalTableId = table_id;
+
+            // Avtomatik stol, agar 'auto' kelgan bo'lsa yoki o'zgargan bo'lsa
+            if (finalTableId === 'auto' || !finalTableId) {
+                // Agar tahrirlashda stol bo'sh qoldirilsa, eski stolni saqlab qolishimiz kerakmi?
+                // Yoki qayta avtomatik qidirish kerakmi?
+                // Hozirgi mantiq bo'yicha, agar 'auto' bo'lsa, qayta qidiramiz
+                finalTableId = findBestAvailableTable(guests, reservation_time);
+                if (!finalTableId) {
+                    console.warn("Update: Avtomatik stol topilmadi, stolsiz saqlanmoqda.");
+                }
+            } else {
+                // Aniq stol tanlangan. Bandlikka tekshiramiz (O'ZIDAN TASHQARI)
+                if (isTableBusy(finalTableId, reservation_time, id)) {
+                    throw new Error("Tanlangan stol ushbu vaqtda band");
+                }
+            }
+
+            db.prepare(`
+                UPDATE reservations 
+                SET customer_name = ?, customer_phone = ?, reservation_time = ?, guests = ?, table_id = ?, note = ?, updated_at = ?, is_synced = 0
+                WHERE id = ?
+            `).run(customer_name, customer_phone, reservation_time, guests, finalTableId, note, updated_at, id);
+
+            notify('reservation-update', id);
+            return { success: true, id, table_id: finalTableId };
+        } catch (error) {
+            console.error('updateReservation error:', error);
             throw error;
         }
     },
@@ -99,20 +150,27 @@ const reservationsController = {
 
 // --- HELPER FUNCTIONS ---
 
-function isTableBusy(tableId, timeStr) {
+function isTableBusy(tableId, timeStr, excludeId = null) {
     const checkTime = new Date(timeStr).getTime();
     const durationMs = RESERVATION_DURATION_MINUTES * 60 * 1000;
     const endTime = checkTime + durationMs;
 
     // Ushbu stol uchun barcha AKTIV bronlarni olamiz
-    // Status: active bo'lishi kerak. Cancelled yoki completed xalaqit bermaydi (agar completed bo'lsa stol bo'shagan hisoblanadi deb faraz qilamiz, yoki completed ham vaqtni egallashi mumkin. Hozircha 'active' ni tekshiramiz)
-
-    const reservations = db.prepare(`
-        SELECT reservation_time FROM reservations 
+    // Status: active bo'lishi kerak.
+    let query = `
+        SELECT id, reservation_time FROM reservations 
         WHERE table_id = ? 
         AND status = 'active' 
         AND deleted_at IS NULL
-    `).all(tableId);
+    `;
+    const params = [tableId];
+
+    if (excludeId) {
+        query += ` AND id != ?`;
+        params.push(excludeId);
+    }
+
+    const reservations = db.prepare(query).all(...params);
 
     return reservations.some(res => {
         const existingStart = new Date(res.reservation_time).getTime();

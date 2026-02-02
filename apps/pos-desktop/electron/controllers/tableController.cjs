@@ -2,12 +2,30 @@ const { db, notify, addToSyncQueue } = require('../database.cjs');
 const crypto = require('crypto');
 
 module.exports = {
-  getHalls: () => db.prepare('SELECT * FROM halls WHERE deleted_at IS NULL').all(),
+  getHalls: () => db.prepare('SELECT * FROM halls WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC').all(),
+
+  updateHallsOrder: (halls) => {
+    // Transactional update
+    const updateStmt = db.prepare('UPDATE halls SET sort_order = ?, is_synced = 0 WHERE id = ?');
+    const transaction = db.transaction((items) => {
+      items.forEach((hall, index) => {
+        updateStmt.run(index, hall.id);
+        addToSyncQueue('halls', hall.id, 'UPDATE', { sort_order: index });
+      });
+    });
+    transaction(halls);
+    notify('halls', null);
+    return { success: true };
+  },
 
   addHall: (name) => {
     const id = crypto.randomUUID();
-    const res = db.prepare('INSERT INTO halls (id, name) VALUES (?, ?)').run(id, name);
-    addToSyncQueue('halls', id, 'INSERT', { id, name });
+    // Get max sort_order
+    const maxOrder = db.prepare("SELECT MAX(sort_order) as maxVal FROM halls WHERE deleted_at IS NULL").get();
+    const nextOrder = (maxOrder && maxOrder.maxVal !== null) ? maxOrder.maxVal + 1 : 0;
+
+    const res = db.prepare('INSERT INTO halls (id, name, sort_order) VALUES (?, ?, ?)').run(id, name, nextOrder);
+    addToSyncQueue('halls', id, 'INSERT', { id, name, sort_order: nextOrder });
     notify('halls', null);
     return res;
   },
@@ -30,12 +48,17 @@ module.exports = {
     return res;
   },
 
-  getTables: () => db.prepare(`
-    SELECT t.*, h.name as hall_name 
-    FROM tables t 
-    LEFT JOIN halls h ON t.hall_id = h.id 
-    WHERE t.deleted_at IS NULL
-  `).all(),
+  getTables: () => {
+    const rows = db.prepare(`
+        SELECT t.*, h.name as hall_name 
+        FROM tables t 
+        LEFT JOIN halls h ON t.hall_id = h.id 
+        WHERE t.deleted_at IS NULL
+    `).all();
+    console.log('IPC getTables returning:', rows.length, 'rows');
+    // console.log(JSON.stringify(rows.slice(0,3)));
+    return rows;
+  },
 
   getTablesByHall: (id) => db.prepare('SELECT * FROM tables WHERE hall_id = ? AND deleted_at IS NULL').all(id),
 
