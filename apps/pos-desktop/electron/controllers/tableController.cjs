@@ -1,4 +1,4 @@
-const { db, notify, addToSyncQueue } = require('../database.cjs');
+const { db, notify } = require('../database.cjs');
 const crypto = require('crypto');
 
 module.exports = {
@@ -10,7 +10,7 @@ module.exports = {
     const transaction = db.transaction((items) => {
       items.forEach((hall, index) => {
         updateStmt.run(index, hall.id);
-        addToSyncQueue('halls', hall.id, 'UPDATE', { sort_order: index });
+        // addToSyncQueue removed
       });
     });
     transaction(halls);
@@ -25,7 +25,7 @@ module.exports = {
     const nextOrder = (maxOrder && maxOrder.maxVal !== null) ? maxOrder.maxVal + 1 : 0;
 
     const res = db.prepare('INSERT INTO halls (id, name, sort_order) VALUES (?, ?, ?)').run(id, name, nextOrder);
-    addToSyncQueue('halls', id, 'INSERT', { id, name, sort_order: nextOrder });
+    // addToSyncQueue removed
     notify('halls', null);
     return res;
   },
@@ -33,7 +33,7 @@ module.exports = {
   deleteHall: (id) => {
     // Soft Delete tables
     db.prepare("UPDATE tables SET deleted_at = ?, is_synced = 0 WHERE hall_id = ?").run(new Date().toISOString(), id);
-    addToSyncQueue('tables', id, 'DELETE_ALL_FOR_HALL', { hallId: id }); // Special op needed or loop update? Loop update is safer.
+    // addToSyncQueue removed // Special op needed or loop update? Loop update is safer.
     // Simplifying: Just let tables update themselves if accessed, but here massive update.
     // Ideally we fetch tables and queue individual updates.
     const tables = db.prepare('SELECT id FROM tables WHERE hall_id = ?').all(id);
@@ -65,7 +65,7 @@ module.exports = {
   addTable: (hallId, name) => {
     const id = crypto.randomUUID();
     const res = db.prepare('INSERT INTO tables (id, hall_id, name, is_synced) VALUES (?, ?, ?, 0)').run(id, hallId, name);
-    addToSyncQueue('tables', id, 'INSERT', { id, hall_id: hallId, name });
+    // addToSyncQueue removed
     notify('tables', null);
     return res;
   },
@@ -86,7 +86,7 @@ module.exports = {
 
   updateTableStatus: (id, status) => {
     const res = db.prepare('UPDATE tables SET status = ?, is_synced = 0 WHERE id = ?').run(status, id);
-    addToSyncQueue('tables', id, 'UPDATE', { status });
+    // addToSyncQueue removed
     notify('tables', null);
     return res;
   },
@@ -94,10 +94,10 @@ module.exports = {
   closeTable: (id) => {
     // Buyurtmalarni o'chirish
     db.prepare('DELETE FROM order_items WHERE table_id = ?').run(id);
-    addToSyncQueue('order_items', id, 'DELETE_ALL_FOR_TABLE', { tableId: id });
+    // addToSyncQueue removed
 
     const res = db.prepare(`UPDATE tables SET status = 'free', guests = 0, start_time = NULL, total_amount = 0, is_synced = 0 WHERE id = ?`).run(id);
-    addToSyncQueue('tables', id, 'UPDATE', { status: 'free', guests: 0, start_time: null, total_amount: 0 });
+    // addToSyncQueue removed
 
     notify('tables', null);
     notify('table-items', id);

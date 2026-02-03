@@ -13,23 +13,11 @@ const userController = require('./controllers/userController.cjs'); // Customers
 const inventoryController = require('./controllers/inventoryController.cjs'); // YANGI
 
 const printerService = require('./services/printerService.cjs');
-// const licenseController = require('./controllers/licenseController.cjs'); // License System (REMOVED)
 const reservationsController = require('./controllers/reservationsController.cjs');
-const licenseService = require('./services/licenseService.cjs'); // YANGI
 
 
 
 function registerIpcHandlers(ipcMain) {
-
-    // ==========================================
-    // 0. LICENSE & ACTIVATION (SaaS)
-    // ==========================================
-    ipcMain.handle('license:get-info', (e, args) => {
-        console.log('IPC: license:get-info called with:', args);
-        return licenseService.getLicense(args);
-    });
-    ipcMain.handle('license:save-token', (e, token) => licenseService.saveLicense(token));
-    ipcMain.handle('license:get-hwid', () => licenseService.getHWID());
 
     // ==========================================
     // 1. AUTH (Tizimga kirish)
@@ -175,11 +163,7 @@ function registerIpcHandlers(ipcMain) {
     ipcMain.handle('printer-test', (e, { printerName, type, port }) => printerService.testPrint(printerName, type, port));
     ipcMain.handle('get-system-printers', () => printerService.getPrinters()); // Added handler
 
-    // Sync
-    ipcMain.handle('sync-restore', async () => {
-        const syncService = require('./services/syncService.cjs');
-        return await syncService.restore();
-    });
+
 
     // ==========================================
     // 10. SHIFT MANAGEMENT (Smena) - YANGI

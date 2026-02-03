@@ -4,8 +4,8 @@ const log = require('electron-log');
 const { initDB, onChange } = require('./database.cjs');
 const startServer = require('./server.cjs');
 const registerIpcHandlers = require('./ipcHandlers.cjs');
-require('./services/syncService.cjs'); // Start Sync Service (Background)
 const { initUpdater } = require('./services/updaterService.cjs');
+
 
 // --- LOGGER SOZLAMALARI ---
 log.transports.file.level = 'info';

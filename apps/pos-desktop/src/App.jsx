@@ -3,7 +3,6 @@ import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeProvider';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorBoundary from './components/ErrorBoundary';
-import LicenseGuard from './components/LicenseGuard'; // YANGI
 import UpdateNotification from './components/UpdateNotification';
 
 // Lazy loading - Code Splitting
@@ -13,19 +12,17 @@ function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <ErrorBoundary>
-        <LicenseGuard>
-          <Router>
-            <Suspense fallback={<LoadingSpinner />}>
-              <Routes>
-                {/* Asosiy Desktop ilova */}
-                <Route path="/" element={<DesktopLayout />} />
+        <Router>
+          <Suspense fallback={<LoadingSpinner />}>
+            <Routes>
+              {/* Asosiy Desktop ilova */}
+              <Route path="/" element={<DesktopLayout />} />
 
-                {/* Boshqa routelar shu yerga qo'shilishi mumkin */}
-              </Routes>
-            </Suspense>
-            {/* <UpdateNotification /> */}
-          </Router>
-        </LicenseGuard>
+              {/* Boshqa routelar shu yerga qo'shilishi mumkin */}
+            </Routes>
+          </Suspense>
+          {/* <UpdateNotification /> */}
+        </Router>
       </ErrorBoundary>
     </ThemeProvider>
   );

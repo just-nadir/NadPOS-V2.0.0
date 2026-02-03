@@ -1,4 +1,4 @@
-const { db, notify, addToSyncQueue } = require('../database.cjs');
+const { db, notify } = require('../database.cjs');
 const crypto = require('crypto');
 
 module.exports = {
@@ -9,7 +9,7 @@ module.exports = {
         const transaction = db.transaction((items) => {
             items.forEach((cat, index) => {
                 updateStmt.run(index, cat.id);
-                addToSyncQueue('categories', cat.id, 'UPDATE', { sort_order: index });
+                // addToSyncQueue removed
             });
         });
         transaction(categories);
@@ -24,7 +24,7 @@ module.exports = {
         const nextOrder = (maxOrder && maxOrder.maxVal !== null) ? maxOrder.maxVal + 1 : 0;
 
         const res = db.prepare('INSERT INTO categories (id, name, sort_order) VALUES (?, ?, ?)').run(id, name, nextOrder);
-        addToSyncQueue('categories', id, 'INSERT', { id, name, sort_order: nextOrder });
+        // addToSyncQueue removed
         notify('products', null);
         notify('categories', null);
         return res;
@@ -63,7 +63,7 @@ module.exports = {
         const transaction = db.transaction((items) => {
             items.forEach((prod, index) => {
                 updateStmt.run(index, prod.id);
-                addToSyncQueue('products', prod.id, 'UPDATE', { sort_order: index });
+                // addToSyncQueue removed
             });
         });
         transaction(products);
@@ -80,7 +80,7 @@ module.exports = {
         const res = db.prepare('INSERT INTO products (id, category_id, name, price, destination, unit_type, track_stock, is_active, sort_order, is_synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)').run(
             id, p.category_id, p.name, p.price, String(p.destination), p.unit_type || 'item', (p.track_stock !== undefined ? p.track_stock : 1), 1, nextOrder
         );
-        addToSyncQueue('products', id, 'INSERT', { ...p, id, sort_order: nextOrder });
+        // addToSyncQueue removed
         notify('products', null);
         return res;
     },
@@ -91,7 +91,7 @@ module.exports = {
             SET category_id = ?, name = ?, price = ?, destination = ?, unit_type = ?, track_stock = ?, is_synced = 0, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `).run(p.category_id, p.name, p.price, String(p.destination), p.unit_type || 'item', (p.track_stock !== undefined ? p.track_stock : 1), p.id);
-        addToSyncQueue('products', p.id, 'UPDATE', p);
+        // addToSyncQueue removed
         notify('products', null);
         return res;
     },

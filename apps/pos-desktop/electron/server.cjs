@@ -35,8 +35,7 @@ const productController = require('./controllers/productController.cjs');
 const orderController = require('./controllers/orderController.cjs');
 const settingsController = require('./controllers/settingsController.cjs');
 const staffController = require('./controllers/staffController.cjs');
-const licenseService = require('./services/licenseService.cjs');
-const syncService = require('./services/syncService.cjs'); // YANGI
+
 
 function startServer() {
   const app = express();
@@ -49,32 +48,7 @@ function startServer() {
   }));
   app.use(express.json());
 
-  // LICENSE MIDDLEWARE
-  app.use(async (req, res, next) => {
-    try {
-      // Ba'zi URLlar ochiq bo'lishi kerak (masalan, login serverga ulanish uchun yoki static fayllar)
-      if (req.path.startsWith('/api/system') || req.path === '/api/login') {
-        return next();
-      }
 
-      // Mobil ilova static fayllari
-      if (!req.path.startsWith('/api')) {
-        return next();
-      }
-
-      // Litsenziyani lokal tekshirish (Await bilan)
-      const license = await licenseService.getLicense({ verifyOnline: false });
-
-      if (!license || (license.status !== 'ACTIVE' && license.status !== 'GRACE_PERIOD')) {
-        console.warn(`⛔ API Access Denied: ${req.path} (License: ${license ? license.status : 'Unknown'})`);
-        return res.status(402).json({ error: 'License Required', status: license ? license.status : 'Unknown' });
-      }
-      next();
-    } catch (err) {
-      console.error('License Middleware Error:', err);
-      res.status(500).json({ error: 'Server Internal Error' });
-    }
-  });
 
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {

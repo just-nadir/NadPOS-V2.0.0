@@ -1,4 +1,4 @@
-const { db, notify, addToSyncQueue } = require('../database.cjs');
+const { db, notify } = require('../database.cjs');
 const printerService = require('../services/printerService.cjs');
 const log = require('electron-log');
 const crypto = require('crypto');
@@ -45,7 +45,7 @@ module.exports = {
                 const id = crypto.randomUUID();
 
                 db.prepare(`INSERT INTO order_items (id, table_id, product_id, product_name, price, quantity, destination) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id, tableId, productId, productName, price, qtyNum, destination);
-                addToSyncQueue('order_items', id, 'INSERT', { id, tableId, productId, productName, price, quantity: qtyNum, destination });
+                // addToSyncQueue removed
 
                 const currentTable = db.prepare('SELECT total_amount, waiter_name FROM tables WHERE id = ?').get(tableId);
                 const newTotal = (currentTable ? currentTable.total_amount : 0) + (price * qtyNum);
@@ -59,7 +59,7 @@ module.exports = {
                     .run(newTotal, new Date().toISOString(), waiterName, tableId);
 
                 // Table update sync
-                addToSyncQueue('tables', tableId, 'UPDATE', { status: 'occupied', total_amount: newTotal, waiter_name: waiterName });
+                // addToSyncQueue removed
             });
 
             const res = addItemTransaction(data);
@@ -158,7 +158,7 @@ module.exports = {
                     const qtyNum = Number(item.qty);
                     const itemId = crypto.randomUUID();
                     insertStmt.run(itemId, tableId, item.productId || item.id, item.name, item.price, qtyNum, actualDestination);
-                    addToSyncQueue('order_items', itemId, 'INSERT', { id: itemId, tableId, productId: item.productId || item.id, product_name: item.name, price: item.price, quantity: qtyNum, destination: actualDestination });
+                    // addToSyncQueue removed
 
                     additionalTotal += (item.price * qtyNum);
 
@@ -185,11 +185,11 @@ module.exports = {
                 if (isFree || isOrphan || isUnknown) {
                     db.prepare(`UPDATE tables SET status = 'occupied', total_amount = ?, start_time = COALESCE(start_time, ?), waiter_id = ?, waiter_name = ? WHERE id = ?`)
                         .run(newTotal, time, waiterId, waiterName, tableId);
-                    addToSyncQueue('tables', tableId, 'UPDATE', { status: 'occupied', total_amount: newTotal, waiter_id: waiterId, waiter_name: waiterName });
+                    // addToSyncQueue removed
                 } else {
                     db.prepare(`UPDATE tables SET total_amount = ? WHERE id = ?`)
                         .run(newTotal, tableId);
-                    addToSyncQueue('tables', tableId, 'UPDATE', { total_amount: newTotal });
+                    // addToSyncQueue removed
                 }
 
                 // Sync each item
@@ -436,17 +436,13 @@ module.exports = {
                 // But our schema expects record_id. 
                 // Let's just use a special operation or list all IDs if possible (expensive).
                 // Or: 'DELETE_ALL_FOR_TABLE'
-                addToSyncQueue('order_items', tableId, 'DELETE_ALL_FOR_TABLE', { tableId });
+                // addToSyncQueue removed
 
                 db.prepare("UPDATE tables SET status = 'free', guests = 0, start_time = NULL, total_amount = 0, current_check_number = 0, waiter_id = 0, waiter_name = NULL WHERE id = ?").run(tableId);
-                addToSyncQueue('tables', tableId, 'UPDATE', { status: 'free', total_amount: 0, current_check_number: 0 });
+                // addToSyncQueue removed
 
                 // Sync Sale
-                addToSyncQueue('sales', saleId, 'INSERT', {
-                    id: saleId, date, total_amount: total, subtotal, discount, payment_method: paymentMethod,
-                    customer_id: customerId, items_json: itemsJson, check_number: checkNumber,
-                    waiter_name: waiterName, guest_count: guestCount, shift_id: activeShift.id, table_name: tableNameForDb
-                });
+                // addToSyncQueue removed
 
                 // Sync Sale Items (loop is already there inside controller, let's hook into it)
                 // Wait, loop is above. We need to add sync there.
@@ -538,15 +534,15 @@ module.exports = {
                     db.prepare(`INSERT INTO cancelled_orders (id, table_id, date, total_amount, waiter_name, items_json, reason) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
                         cancelledId, cancelledData.table_id, cancelledData.date, cancelledData.total_amount, cancelledData.waiter_name, cancelledData.items_json, cancelledData.reason
                     );
-                    addToSyncQueue('cancelled_orders', cancelledId, 'INSERT', { ...cancelledData, id: cancelledId });
+                    // addToSyncQueue removed
                 }
 
                 // 3. Tozalash
                 db.prepare('DELETE FROM order_items WHERE table_id = ?').run(tableId);
-                addToSyncQueue('order_items', tableId, 'DELETE_ALL_FOR_TABLE', { tableId });
+                // addToSyncQueue removed
 
                 db.prepare("UPDATE tables SET status = 'free', guests = 0, start_time = NULL, total_amount = 0, current_check_number = 0, waiter_id = 0, waiter_name = NULL WHERE id = ?").run(tableId);
-                addToSyncQueue('tables', tableId, 'UPDATE', { status: 'free', total_amount: 0 });
+                // addToSyncQueue removed
 
                 // Sync Cancelled Order
                 if (items.length > 0) {

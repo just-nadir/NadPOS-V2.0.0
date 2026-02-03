@@ -366,42 +366,6 @@ const Settings = () => {
               </div>
             </div>
 
-            {/* --- RESTORE DATA --- */}
-            <div className="bg-card p-8 rounded-3xl shadow-sm border border-border">
-              <h3 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-3"><History size={28} className="text-red-500" /> Ma'lumotlarni Tiklash</h3>
-              <div className="space-y-4">
-                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800 flex items-start gap-3">
-                  <Shield className="text-red-500 mt-1" size={20} />
-                  <div>
-                    <p className="font-bold text-red-700 dark:text-red-400">Diqqat!</p>
-                    <p className="text-sm text-red-600/80 dark:text-red-300/80">Bu amal serverdagi barcha ma'lumotlarni ushbu kompyuterga qayta yuklaydi. Internet tezligiga qarab biroz vaqt olishi mumkin.</p>
-                  </div>
-                </div>
-                <button
-                  onClick={async () => {
-                    if (!confirm("Haqiqatan ham ma'lumotlarni qayta tiklamoqchimisiz?")) return;
-                    setLoading(true);
-                    try {
-                      const res = await window.electron.ipcRenderer.invoke('sync-restore');
-                      if (res.success) {
-                        showToast('success', "Ma'lumotlar muvaffaqiyatli tiklandi!");
-                      } else {
-                        showToast('error', "Xatolik: " + res.message);
-                      }
-                    } catch (e) {
-                      showToast('error', "Tizim xatoligi shim.");
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  disabled={loading}
-                  className="w-full h-14 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 rounded-xl font-bold transition-all flex items-center justify-center gap-3 border border-red-200 dark:border-red-800"
-                >
-                  {loading ? <RefreshCw className="animate-spin" /> : <Database size={20} />}
-                  Ma'lumotlarni Qayta Yuklash (Restore)
-                </button>
-              </div>
-            </div>
           </div>
         )}
 

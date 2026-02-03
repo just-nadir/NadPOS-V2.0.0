@@ -414,20 +414,7 @@ function createV2Tables() {
         db.prepare("ALTER TABLE reservations ADD COLUMN note TEXT").run();
     } catch (e) { /* Column likely exists */ }
 
-    // ==========================================
-    // 12. SYNC QUEUE (Offline-First SaaS)
-    // ==========================================
-    db.prepare(`CREATE TABLE IF NOT EXISTS sync_queue (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        table_name TEXT,
-        record_id TEXT,
-        operation TEXT, -- 'INSERT', 'UPDATE', 'DELETE'
-        payload TEXT, -- JSON data
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        status TEXT DEFAULT 'pending', -- 'pending', 'synced', 'failed'
-        retry_count INTEGER DEFAULT 0,
-        error_message TEXT
-    )`).run();
+
 
 
     // --- Indexes (Updated) ---
@@ -464,8 +451,7 @@ function createV2Tables() {
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_supplies_status ON supplies(status)`).run();
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_supply_items_supply ON supply_items(supply_id)`).run();
 
-    // Sync Queue Index
-    db.prepare(`CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status)`).run();
+
 
     // --- NEW: Sync & Update Performance Indexes (V2.0.1) ---
     const tablesToSync = [
@@ -835,33 +821,13 @@ function seedTables() {
     }
 }
 
-// --- SYNC HELPER ---
-function addToSyncQueue(tableName, recordId, operation, payload) {
-    try {
-        const stmt = db.prepare(`
-            INSERT INTO sync_queue (table_name, record_id, operation, payload)
-            VALUES (?, ?, ?, ?)
-        `);
-        stmt.run(tableName, recordId, operation, JSON.stringify(payload));
-        // console.log(`📦 Added to SyncQueue: ${operation} ${tableName} ${recordId}`);
-    } catch (error) {
-        log.error("Failed to add to SyncQueue:", error);
-    }
-}
-
 // --- OPTIMIZATSIYA VA TOZALASH ---
 function runOptimize() {
     try {
         console.log("🧹 Database Optimizatsiyasi boshlandi...");
 
-        // 1. Pruning (Eski sync loglarni tozalash - 7 kundan oldingi)
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const res = db.prepare("DELETE FROM sync_queue WHERE status = 'synced' AND created_at < ?").run(sevenDaysAgo);
-        console.log(`🗑️ Synced Loglar tozalandi: ${res.changes} ta qator.`);
-
-        // 2. Analyze (Query plannerini yangilash)
+        // Query plannerini yangilash
         db.pragma('optimize'); // SQLite auto-optimize
-        // Yoki db.prepare('ANALYZE').run(); // Agar optimize yetarli bo'lmasa
 
         console.log("✅ Database Optimizatsiyasi yakunlandi.");
     } catch (e) {
@@ -883,7 +849,7 @@ module.exports = {
     uuidv4,
     getRestaurantId, // Getter orqali
     RESTAURANT_ID,  // Hozirgi qiymat (require paytida) - ehtiyot bo'lish kerak
-    addToSyncQueue,
     runOptimize // Export
+
 };
 

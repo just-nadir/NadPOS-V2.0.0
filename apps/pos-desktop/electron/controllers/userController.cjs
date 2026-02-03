@@ -1,4 +1,4 @@
-const { db, notify, addToSyncQueue } = require('../database.cjs');
+const { db, notify } = require('../database.cjs');
 const crypto = require('crypto');
 
 module.exports = {
@@ -7,7 +7,7 @@ module.exports = {
   addCustomer: (c) => {
     const id = crypto.randomUUID();
     const res = db.prepare('INSERT INTO customers (id, name, phone, type, value, balance, birthday, debt, is_synced) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)').run(id, c.name, c.phone, c.type, c.value, 0, c.birthday);
-    addToSyncQueue('customers', id, 'INSERT', { id, name: c.name, phone: c.phone, type: c.type, value: c.value, balance: 0, birthday: c.birthday, debt: 0 });
+    // addToSyncQueue removed
     notify('customers', null);
     return res;
   },
@@ -48,11 +48,11 @@ module.exports = {
     const date = new Date().toISOString();
     const updateDebt = db.transaction(() => {
       db.prepare('UPDATE customers SET debt = debt - ?, is_synced = 0 WHERE id = ?').run(amount, customerId);
-      addToSyncQueue('customers', customerId, 'UPDATE', { debt_reduction: amount }); // Simplified payload logic, ideally sync full state or op
+      // addToSyncQueue removed // Simplified payload logic, ideally sync full state or op
 
       const historyId = crypto.randomUUID();
       db.prepare('INSERT INTO debt_history (id, customer_id, amount, type, date, comment, is_synced) VALUES (?, ?, ?, ?, ?, ?, 0)').run(historyId, customerId, amount, 'payment', date, comment);
-      addToSyncQueue('debt_history', historyId, 'INSERT', { id: historyId, customer_id: customerId, amount, type: 'payment', date, comment });
+      // addToSyncQueue removed
     });
     const res = updateDebt();
     notify('customers', null);

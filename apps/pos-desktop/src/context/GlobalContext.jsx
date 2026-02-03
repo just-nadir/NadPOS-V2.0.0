@@ -68,7 +68,7 @@ export const GlobalProvider = ({ children }) => {
 
   const login = async (userData) => {
     setUser(userData);
-    await checkShift(); // Login paytida qayta tekshiramiz (Sync ma'lumotlari uchun)
+    await checkShift();
   };
 
   const logout = () => {
