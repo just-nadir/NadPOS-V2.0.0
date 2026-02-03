@@ -14,6 +14,7 @@ import { Modal } from '../components/ui/Modal';
 import { ProductCard } from '../components/features/ProductCard';
 import { CartBottomSheet } from '../components/features/CartBottomSheet';
 import { CategoryTabs } from '../components/features/CategoryTabs';
+import { NumpadModal } from '../components/ui/NumpadModal';
 
 export default function OrderPage() {
     const { tableId } = useParams();
@@ -38,6 +39,9 @@ export default function OrderPage() {
     const [success, setSuccess] = useState(false);
     const [showExistingOrders, setShowExistingOrders] = useState(false);
     const [viewMode, setViewMode] = useState('grouped'); // 'grouped' or 'detailed'
+
+    // Numpad State
+    const [numpadModal, setNumpadModal] = useState({ isOpen: false, product: null });
 
     const groupedItems = useMemo(() => {
         const map = new Map();
@@ -165,6 +169,8 @@ export default function OrderPage() {
             setExistingItems(items || []);
         } catch (error) {
             console.error('Load table items error:', error);
+            // Xatolikni foydalanuvchiga ko'rsatish
+            alert(`Xatolik: Serverga ulanib bo'lmadi.\nManzil: ${window.location.hostname}:3001\nXato: ${error.message}`);
         }
     };
 
@@ -175,18 +181,34 @@ export default function OrderPage() {
         return filtered;
     }, [products, activeCategory, search]);
 
-    const addToCart = useCallback((product) => {
+    const handleProductSelect = useCallback((product) => {
+        if (product.unit_type === 'kg') {
+            setNumpadModal({ isOpen: true, product });
+        } else {
+            addToCart(product, 1);
+        }
+    }, []);
+
+    const handleNumpadConfirm = useCallback((qty) => {
+        if (numpadModal.product && qty > 0) {
+            addToCart(numpadModal.product, qty);
+        }
+        setNumpadModal({ isOpen: false, product: null });
+    }, [numpadModal.product]);
+
+    const addToCart = useCallback((product, quantity = 1) => {
         setCart(prev => {
             const existing = prev.find(item => item.id === product.id);
             if (existing) {
-                return prev.map(item => item.id === product.id ? { ...item, qty: item.qty + 1 } : item);
+                return prev.map(item => item.id === product.id ? { ...item, qty: item.qty + quantity } : item);
             }
             return [...prev, {
                 id: product.id,
                 productId: product.id,
                 name: product.name,
                 price: product.price,
-                qty: 1,
+                unit_type: product.unit_type,
+                qty: quantity,
                 destination: product.destination
             }];
         });
@@ -212,18 +234,13 @@ export default function OrderPage() {
         setSending(true);
         try {
             await addBulkItems(tableId, cart, user.id);
-            if (table?.status === 'free' && guestsCount === 0) {
-                setShowGuestsModal(true);
-                setShowCart(false);
-            } else {
-                setSuccess(true);
-                setShowCart(false);
-                setTimeout(() => {
-                    setCart([]);
-                    setSuccess(false);
-                    navigate('/tables', { replace: true });
-                }, 1500);
-            }
+            setSuccess(true);
+            setShowCart(false);
+            setTimeout(() => {
+                setCart([]);
+                setSuccess(false);
+                navigate('/tables', { replace: true });
+            }, 1000); // 1.5s dan 1s ga tushirildi, tezroq bo'lishi uchun
         } catch (error) {
             console.error('Send order error:', error);
             alert('Xatolik: ' + (error.message || 'Buyurtma yuborilmadi'));
@@ -232,20 +249,7 @@ export default function OrderPage() {
         }
     };
 
-    const handleSaveGuests = async () => {
-        try {
-            await updateTableGuests(tableId, guestsCount);
-            setShowGuestsModal(false);
-            setSuccess(true);
-            setTimeout(() => {
-                setCart([]);
-                setSuccess(false);
-                navigate('/tables', { replace: true });
-            }, 1500);
-        } catch (error) {
-            console.error('Update guests error:', error);
-        }
-    };
+
 
     if (loading) {
         return (
@@ -307,7 +311,7 @@ export default function OrderPage() {
                                     key={product.id}
                                     product={product}
                                     qty={inCart?.qty || 0}
-                                    onAdd={addToCart}
+                                    onAdd={() => handleProductSelect(product)}
                                 />
                             );
                         })}
@@ -362,31 +366,7 @@ export default function OrderPage() {
                 total={cartTotal}
             />
 
-            {/* Guests Modal */}
-            <Modal
-                isOpen={showGuestsModal}
-                title="Mehmonlar soni"
-                onClose={() => { }}
-                showCloseButton={false}
-            >
-                <div className="flex flex-col items-center gap-6">
-                    <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center">
-                        <Users size={32} className="text-indigo-500" />
-                    </div>
-                    <div className="flex items-center justify-center gap-6 w-full">
-                        <Button variant="secondary" onClick={() => setGuestsCount(Math.max(0, guestsCount - 1))} className="!h-14 !w-14 !rounded-2xl">
-                            <Minus size={24} />
-                        </Button>
-                        <span className="text-5xl font-bold text-white w-20 text-center">{guestsCount}</span>
-                        <Button variant="primary" onClick={() => setGuestsCount(guestsCount + 1)} className="!h-14 !w-14 !rounded-2xl">
-                            <Plus size={24} />
-                        </Button>
-                    </div>
-                    <Button variant="primary" size="lg" onClick={handleSaveGuests} className="w-full mt-2 !h-14 !text-lg !rounded-2xl">
-                        Davom etish
-                    </Button>
-                </div>
-            </Modal>
+
 
             {/* Existing Orders Modal */}
             <Modal
@@ -429,6 +409,16 @@ export default function OrderPage() {
                     </div>
                 </div>
             </Modal>
+
+            {/* Numpad Modal for KG items */}
+            <NumpadModal
+                isOpen={numpadModal.isOpen}
+                onClose={() => setNumpadModal({ isOpen: false, product: null })}
+                onConfirm={handleNumpadConfirm}
+                title={numpadModal.product?.name}
+                initialValue=""
+                suffix={numpadModal.product?.unit_type || 'kg'}
+            />
 
             {/* Success Overlay */}
             <AnimatePresence>

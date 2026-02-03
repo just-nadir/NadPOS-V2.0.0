@@ -1,6 +1,6 @@
 // API xizmatlari - Server bilan aloqa
 const API_BASE = import.meta.env.DEV
-    ? `http://${window.location.hostname}:3000`
+    ? `http://${window.location.hostname}:3001`
     : '';
 
 // Serverdan ma'lumot olish

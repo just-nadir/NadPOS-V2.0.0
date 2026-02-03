@@ -40,9 +40,13 @@ const syncService = require('./services/syncService.cjs'); // YANGI
 
 function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = 3001;
 
-  app.use(cors());
+  app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
   app.use(express.json());
 
   // LICENSE MIDDLEWARE

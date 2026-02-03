@@ -15,8 +15,10 @@ export function useSocket(onUpdate) {
     }, [onUpdate]);
 
     useEffect(() => {
-        // Joriy sahifa URL sidan server manzilini olish
-        const serverUrl = window.location.origin;
+        // DEV mode: port 3001, PROD mode: same origin
+        const serverUrl = import.meta.env.DEV
+            ? `http://${window.location.hostname}:3001`
+            : window.location.origin;
 
         // Socket ulanishini yaratish
         socketRef.current = io(serverUrl, {
